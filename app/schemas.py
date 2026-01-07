@@ -8,6 +8,7 @@ class AgentName(str, Enum):
     EMEM = "Emem"
     SOLA = "Sola"
     KEMI = "Kemi"
+    RECOMMENDER = "Recommender"
 
 
 class UserLevel(str, Enum):
@@ -28,7 +29,8 @@ class ChatContext(BaseModel):
     track: Optional[str] = None
     task_brief: Optional[str] = None
     deadline: Optional[str] = None
-
+    cv_text: Optional[str] = None
+    bio_summary: Optional[str] = None
 
 class ChatRequest(BaseModel):
     user_id: str
@@ -153,3 +155,16 @@ class ResourceGenerationResponse(BaseModel):
     category: str
     content: str  # Markdown content
 
+
+class RecommendationLetterRequest(BaseModel):
+    user_id: str
+    cv_text: str
+    track: str
+    internship_duration_weeks: Literal[12, 24]
+    performance_summary: Optional[str] = None
+
+
+class RecommendationLetterResponse(BaseModel):
+    letter_text: str
+    tone: str
+    duration_weeks: int

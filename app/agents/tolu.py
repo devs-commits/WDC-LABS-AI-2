@@ -1,7 +1,7 @@
 import google.generativeai as genai
 from pathlib import Path
-from typing import Optional, List
-import os
+from typing import List
+import json
 
 # Load prompt from file
 PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "tolu.txt"
@@ -20,65 +20,81 @@ async def assess_bio(
 ) -> dict:
     """
     Analyze a user's bio/resume and assign their skill level.
-    
+
     Returns:
         dict with response_text, assessed_level, reasoning, warmup_mode
     """
     system_prompt = get_system_prompt()
-    
+
     assessment_prompt = f"""
 {system_prompt}
 
 ---
 
-**CURRENT TASK: Assess this new intern's background.**
+**TASK: INTERN BACKGROUND REVIEW**
 
-Track they are joining: {track}
+You are reviewing this intern’s submitted bio/resume as part of an intake process.
+You are experienced and realistic — not overly encouraging.
 
-Their submitted bio/resume:
+Track: {track}
+
+Submitted bio/resume:
 \"\"\"
 {bio_text}
 \"\"\"
 
-Based on this, determine their level and respond with:
-1. A brief welcome message (2-3 sentences max)
-2. Their assessed level (Level 0, Level 1, or Level 2)
-3. Your reasoning (1-2 sentences)
+Assess the intern based on:
+- Evidence of hands-on work (projects, tools, real tasks)
+- Clarity and specificity of experience
+- Gaps or missing fundamentals
+- Signals of readiness vs curiosity-only interest
 
-Format your response as JSON:
+Then respond in JSON with:
+
+1. A short, professional welcome (neutral tone, not hype)
+2. Assessed level:
+   - Level 0: New / theory-only / unclear exposure
+   - Level 1: Some hands-on exposure, still inconsistent
+   - Level 2: Clear practical experience and autonomy
+3. Reasoning:
+   - Explicitly reference what was present or missing in the bio
+   - 1–2 sentences max
+   - No motivational language
+
+Format strictly as JSON:
 {{
-    "response_text": "Your welcome message here",
-    "assessed_level": "Level 0" | "Level 1" | "Level 2",
-    "reasoning": "Why you chose this level"
+  "response_text": "...",
+  "assessed_level": "Level 0 | Level 1 | Level 2",
+  "reasoning": "..."
 }}
 """
 
     response = await model.generate_content_async(assessment_prompt)
-    
-    # Parse JSON from response
-    import json
+
     try:
-        # Try to extract JSON from the response
         text = response.text.strip()
+
+        # Strip markdown fences if present
         if text.startswith("```json"):
             text = text[7:]
         if text.startswith("```"):
             text = text[3:]
         if text.endswith("```"):
             text = text[:-3]
-        
+
         result = json.loads(text.strip())
-        
-        # Set warmup mode for Level 0
+
+        # Warmup mode only for Level 0
         result["warmup_mode"] = result.get("assessed_level") == "Level 0"
-        
+
         return result
+
     except json.JSONDecodeError:
-        # Fallback if JSON parsing fails
+        # Safe fallback
         return {
             "response_text": response.text,
             "assessed_level": "Level 1",
-            "reasoning": "Unable to parse assessment, defaulting to Level 1",
+            "reasoning": "Unable to reliably parse assessment; defaulting to Level 1.",
             "warmup_mode": False
         }
 
@@ -93,13 +109,13 @@ async def respond_to_message(
     Respond to an administrative or general message as Tolu.
     """
     system_prompt = get_system_prompt()
-    
+
     history_text = ""
-    for msg in chat_history[-5:]:  # Last 5 messages for context
+    for msg in chat_history[-5:]:
         role = msg.get("role", "user")
         content = msg.get("content", "")
         history_text += f"{role.upper()}: {content}\n"
-    
+
     prompt = f"""
 {system_prompt}
 
@@ -115,7 +131,10 @@ Track: {context.get('track', 'Unknown')}
 **USER MESSAGE:**
 {message}
 
-Respond as Tolu. Be brief and professional.
+Respond as Tolu.
+- Be professional
+- Be concise
+- No coaching unless explicitly asked
 """
 
     response = await model.generate_content_async(prompt)

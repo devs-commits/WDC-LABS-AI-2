@@ -6,7 +6,7 @@ The "Central Brain" that routes messages to the appropriate agent based on conte
 import google.generativeai as genai
 from typing import Optional, List
 from .schemas import AgentName, ChatContext, ChatResponse
-from .agents import tolu, emem, sola, kemi
+from .agents import tolu, emem, sola, kemi, recommender
 
 
 class Orchestrator:
@@ -57,6 +57,17 @@ Your job is to determine which AI agent should respond to a user's message.
         if context.is_first_login:
             return AgentName.TOLU
         
+        # Priority 3: Recommendation letters (hard rule, no AI routing)
+        if any(k in message.lower() for k in [
+            "recommendation letter",
+            "reference letter",
+            "referee",
+            "12 weeks recommendation",
+            "24 weeks recommendation",
+            "recommendation"
+        ]):
+            return AgentName.RECOMMENDER
+
         # Use AI to determine the best agent
         try:
             context_info = f"""
@@ -124,6 +135,8 @@ Which agent should respond? Reply with ONLY the agent name (Tolu, Emem, Sola, or
             "task_brief": context.task_brief,
             "deadline": context.deadline,
             "task_id": context.task_id
+            "cv_text": context.cv_text,
+            "bio_summary": context.bio_summary
         }
         
         # Route to appropriate agent
@@ -143,6 +156,15 @@ Which agent should respond? Reply with ONLY the agent name (Tolu, Emem, Sola, or
             response_text = await kemi.respond_to_message(
                 message, ctx, chat_history, self.model
             )
+        elif agent == AgentName.RECOMMENDER:
+            response = await recommender.generate_letter(
+                cv_text=context.get("cv_text", ""),
+                internship_duration_weeks=context.get("internship_duration_weeks", 12),
+                track=context.get("track", "Unknown"),
+                performance_summary=context.get("performance_summary"),
+                model=self.model
+            )
+            response_text = response.get("letter_text", "")
         else:
             response_text = "I'm not sure how to help with that. Please rephrase your question."
         
@@ -228,3 +250,17 @@ Which agent should respond? Reply with ONLY the agent name (Tolu, Emem, Sola, or
         return await kemi.conduct_mock_interview(
             interview_type, question_number, previous_answer, self.model
         )
+    async def generate_recommendation_letter(
+    self,
+    cv_text: str,
+    internship_duration_weeks: int,
+    track: str,
+    performance_summary: Optional[str] = None
+) -> dict:
+    return await recommender.generate_letter(
+        cv_text,
+        internship_duration_weeks,
+        track,
+        performance_summary,
+        self.model
+    )

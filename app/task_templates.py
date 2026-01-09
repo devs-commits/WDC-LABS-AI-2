@@ -256,8 +256,9 @@ def generate_task(
     )
     
     # Calculate deadline based on difficulty
-    deadline_days = {"beginner": 3, "intermediate": 2, "advanced": 1}
-    deadline = now + timedelta(days=deadline_days.get(difficulty, 2))
+    NEXT_DAY = 1
+    deadline = now + timedelta(days=NEXT_DAY)
+
     
     return {
         "title": title,

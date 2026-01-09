@@ -271,7 +271,7 @@ def generate_task(
             "tone": "professional",
             "expertise": track,
             "instruction": "Review submission thoroughly",
-            "duration": f"{deadline_days.get(difficulty, 2)} days"
+            "duration": f"{duration_days} day{'s' if duration_days != 1 else ''}"
         },
         "metadata": {
             "company": company,

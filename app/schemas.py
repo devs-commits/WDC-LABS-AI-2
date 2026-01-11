@@ -106,6 +106,9 @@ class SubmissionReviewResponse(BaseModel):
     feedback: str
     passed: bool
     score: Optional[int] = None
+    technical_accuracy: Optional[int] = None
+    reliability_speed: Optional[int] = None
+    communication_score: Optional[int] = None
     portfolio_bullet: Optional[str] = None  # Kemi's CV translation if passed
 
 

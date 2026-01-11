@@ -474,6 +474,9 @@ async def review_submission(request: SubmissionReviewRequest):
         "feedback": "string",
         "passed": boolean,
         "score": integer (0-100),
+        "technical_accuracy": integer (0-100),
+        "reliability_speed": integer (0-100),
+        "communication_score": integer (0-100),
         "portfolio_bullet": "string or null"
     }}
     """
@@ -529,6 +532,9 @@ async def review_submission(request: SubmissionReviewRequest):
                 feedback=data.get("feedback", "Submission received."),
                 passed=data.get("passed", False),
                 score=data.get("score", 0),
+                technical_accuracy=data.get("technical_accuracy", 70),
+                reliability_speed=data.get("reliability_speed", 70),
+                communication_score=data.get("communication_score", 70),
                 portfolio_bullet=data.get("portfolio_bullet")
             )
         else:

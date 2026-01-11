@@ -12,6 +12,9 @@ def get_system_prompt() -> str:
     with open(PROMPT_PATH, "r", encoding="utf-8") as f:
         return f.read()
 
+def respond(message: str, context: dict | None = None):
+    return "Tolu response placeholder"
+
 
 async def assess_bio(
     bio_text: str,

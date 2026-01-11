@@ -11,6 +11,10 @@ def get_system_prompt() -> str:
     with open(PROMPT_PATH, "r", encoding="utf-8") as f:
         return f.read()
 
+def respond(message: str, context: dict | None = None) -> str:
+    """Simple response placeholder for Emem."""
+    return "Emem response placeholder"
+
 def expectation_by_level(level: str) -> str:
     if level == "Level 0":
         return (
@@ -29,6 +33,8 @@ def expectation_by_level(level: str) -> str:
         "This intern has some experience but may still need guidance. "
         "Set standard intern expectations and monitor progress."
     )
+
+
 
 async def assign_task(
     task_title: str,
@@ -162,4 +168,6 @@ This should feel like real workplace chaos — frustrating but professional.
 
     response = await model.generate_content_async(prompt)
     return response.text
+
+
 

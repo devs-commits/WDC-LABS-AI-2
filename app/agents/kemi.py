@@ -13,6 +13,11 @@ def get_system_prompt() -> str:
         return f.read()
 
 
+def respond(message: str, context: dict | None = None) -> str:
+    """Simple response placeholder for Kemi."""
+    return "Kemi response placeholder"
+
+
 async def translate_to_cv_bullet(
     task_title: str,
     task_description: str,

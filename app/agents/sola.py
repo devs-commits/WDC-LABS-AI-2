@@ -1,6 +1,7 @@
 import google.generativeai as genai
 from pathlib import Path
 from typing import Optional, List
+from app.archives.index import ARCHIVE_LIBRARY
 import json
 
 # Load prompt from file
@@ -11,6 +12,24 @@ def get_system_prompt() -> str:
     """Load Sola's system prompt from file."""
     with open(PROMPT_PATH, "r", encoding="utf-8") as f:
         return f.read()
+
+def respond(message: str, context: dict | None = None) -> str:
+    """Simple response placeholder for Sola."""
+    return "Sola response placeholder"
+
+def select_task_resources(task_brief: str, track: str) -> list:
+    resources = []
+
+    task_lower = task_brief.lower()
+
+    for item in ARCHIVE_LIBRARY.get(track, []):
+        if any(tag in task_lower for tag in item["tags"]):
+            resources.append(item)
+
+    # Always add one general workflow hint
+    resources += ARCHIVE_LIBRARY.get("general", [])[:1]
+
+    return resources[:3]  # hard limit
 
 
 async def review_submission(

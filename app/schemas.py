@@ -1,6 +1,7 @@
 from pydantic import BaseModel
-from typing import Optional, List, Literal
+from typing import Optional, List, Literal, Dict, Any
 from enum import Enum
+
 
 
 class AgentName(str, Enum):
@@ -168,3 +169,19 @@ class RecommendationLetterResponse(BaseModel):
     letter_text: str
     tone: str
     duration_weeks: int
+
+
+class OrchestratorInput(BaseModel):
+    message: str
+    current_task_id: Optional[str] = None
+    uploaded_file: Optional[str] = None  # placeholder for now
+    user_region: str = "NG"
+    user_level: int = 0
+    user_track: Optional[str] = None
+
+
+class OrchestratorResponse(BaseModel):
+    agent: str
+    intent: str
+    content: str
+    metadata: Dict[str, Any] = {}

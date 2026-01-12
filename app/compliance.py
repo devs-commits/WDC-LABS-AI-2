@@ -324,7 +324,7 @@ ETHICAL_TRAP_SCENARIOS = [
 # SCORING ETHICS
 # ============================================
 
-def evaluate_ethical_response(user_action: str, trap_scenario: dict) -> dict:
+def evaluate_ethical_response(user_action: str) -> dict:
     """
     Score user's response to an ethical trap.
     Returns: {passed: bool, score: 0-100, feedback: str}

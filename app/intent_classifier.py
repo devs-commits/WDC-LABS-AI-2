@@ -58,7 +58,7 @@ def classify_intent(message: str) -> str:
         intent = data.get("intent")
         if intent in INTENTS:
             return intent
-    except Exception:
+    except json.JSONDecodeError:
         pass
 
     # HARD fallback

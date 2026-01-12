@@ -1,21 +1,18 @@
 from pathlib import Path
-import os
-from google import genai
-
-# Configure Gemini once
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+import google.generativeai as genai
+from typing import Optional
 
 
 class BaseAgent:
-    def __init__(self, name: str, prompt_file: str):
+    def __init__(self, name: str, prompt_file: str, model_name: str = "gemini-1.5-pro"):
         self.name = name
         self.system_prompt = self._load_prompt(prompt_file)
 
-        # One model instance per agent is fine
-        self.model = genai.GenerativeModel(
-            model_name="gemini-1.5-pro",
-            system_instruction=self.system_prompt
-        )
+        # Create a per-agent model instance (best-effort)
+        try:
+            self.model = genai.GenerativeModel(model_name)
+        except (AttributeError, TypeError, RuntimeError, ImportError):
+            self.model = None
 
     def _load_prompt(self, prompt_file: str) -> str:
         path = Path(prompt_file)
@@ -23,16 +20,21 @@ class BaseAgent:
             raise FileNotFoundError(f"Prompt not found: {prompt_file}")
         return path.read_text(encoding="utf-8")
 
-    def respond(self, user_message: str, context: dict | None = None) -> str:
-        """
-        context is optional and future-proofed (memory, metadata, etc.)
-        """
+    async def respond(self, user_message: str, _context: Optional[dict] = None) -> str:
+        """Generate a short response using the agent's model.
 
-        response = self.model.generate_content(
-            user_message,
-            generation_config={
-                "temperature": 0.3,
-            }
-        )
+        If the model isn't available, return an empty string to avoid runtime errors.
+        """
+        if not self.model:
+            return ""
 
-        return response.text.strip()
+        # Prefer async generation API when available
+        try:
+            response = await self.model.generate_content_async(user_message)
+            return response.text
+        except (AttributeError, RuntimeError):
+            try:
+                resp = self.model.generate_content(user_message)
+                return getattr(resp, "text", "")
+            except (AttributeError, RuntimeError):
+                return ""

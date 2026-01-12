@@ -1,185 +1,165 @@
 """
 WDC Labs AI Orchestrator
-The "Central Brain" that routes messages to the appropriate agent based on context.
+The Central Brain that routes messages to the appropriate agent.
 """
-
-import google.generativeai as genai
 from typing import Optional, List
+import google.generativeai as genai
+
 from .schemas import AgentName, ChatContext, ChatResponse
 from .agents import tolu, emem, sola, kemi, recommender
 
 
 class Orchestrator:
     """
-    The Message Router that determines which agent should respond.
-    
-    Routing Logic:
-    - Submission context → Sola (Technical Supervisor)
-    - "help", "worried", "resume", "scared" → Kemi (Career Coach)
-    - "deadline", "brief", "client", "task" → Emem (Project Manager)
-    - First login, "salary", "contract", "hours" → Tolu (Onboarding)
-    - Default → Sola (for general technical queries)
+    Central message router enforcing Golden Master routing rules.
     """
-    
+
     def __init__(self, model: genai.GenerativeModel):
         self.model = model
-        
-        # Agent router prompt for AI-based routing
+
         self.router_prompt = """You are an intelligent message router for a virtual office training system.
-Your job is to determine which AI agent should respond to a user's message.
 
-**AGENTS:**
-- **Tolu** (Onboarding Officer): Handles administrative questions, HR topics, contracts, salary, working hours, policies, onboarding, certificates, recommendations.
-- **Emem** (Project Manager): Handles deadlines, task assignments, deliverables, client work, project status, priorities, briefs, submissions.
-- **Sola** (Technical Supervisor): Handles technical questions, code reviews, debugging, errors, how-to questions, technical explanations, work reviews.
-- **Kemi** (Career Coach): Handles emotional support, career advice, interview prep, resume/CV help, encouragement, motivation, feelings of doubt or anxiety.
+AGENTS:
+- Tolu (Onboarding / HR / Admin / Policies / Certificates / Recommendations)
+- Emem (Project Manager: tasks, deadlines, briefs, deliverables, clients)
+- Sola (Technical Supervisor: code, debugging, reviews, submissions)
+- Kemi (Career Coach: CVs, interviews, confidence, emotional support)
 
-**ROUTING RULES:**
-1. If the user is submitting work for review → Sola
-2. If the user mentions feeling worried, stressed, overwhelmed, or needs encouragement → Kemi
-3. If the user asks about deadlines, tasks, or project work → Emem
-4. If the user asks administrative/HR questions → Tolu
-5. If the user has a technical question or needs help with code/work → Sola
-6. Default to Sola for general queries
+ROUTING RULES (STRICT):
+1. Work submissions or reviews → Sola
+2. Emotional support, CV, interview prep → Kemi
+3. Tasks, deadlines, briefs → Emem
+4. HR, admin, certificates, recommendations → Tolu
+5. Technical help → Sola
+6. Default → Sola
 
-**RESPOND WITH ONLY ONE WORD:** Tolu, Emem, Sola, or Kemi
+Respond with ONLY one word:
+Tolu, Emem, Sola, or Kemi
 """
-    
+
+    # ---------------------------
+    # AGENT DETERMINATION
+    # ---------------------------
+
     async def determine_agent(self, message: str, context: ChatContext) -> AgentName:
-        """
-        Use AI to determine which agent should respond based on message content and context.
-        """
-        # Priority 1: Submission always goes to Sola
+        msg = message.lower()
+
+        # HARD RULES (NO AI)
         if context.is_submission:
             return AgentName.SOLA
-        
-        # Priority 2: First login goes to Tolu
+
         if context.is_first_login:
             return AgentName.TOLU
-        
-        # Priority 3: Recommendation letters (hard rule, no AI routing)
-        if any(k in message.lower() for k in [
+
+        if any(k in msg for k in [
             "recommendation letter",
             "reference letter",
             "referee",
             "12 weeks recommendation",
-            "24 weeks recommendation",
-            "recommendation"
+            "24 weeks recommendation"
         ]):
             return AgentName.RECOMMENDER
 
-        # Use AI to determine the best agent
+        # AI ROUTING
         try:
             context_info = f"""
 User Level: {context.user_level or 'Unknown'}
 Track: {context.track or 'Unknown'}
-Current Task: {context.task_brief or 'None'}
+Task: {context.task_brief or 'None'}
 """
-            
-            routing_request = f"""{self.router_prompt}
 
-**CONTEXT:**
+            prompt = f"""{self.router_prompt}
+
+CONTEXT:
 {context_info}
 
-**USER MESSAGE:**
+USER MESSAGE:
 {message}
+"""
 
-Which agent should respond? Reply with ONLY the agent name (Tolu, Emem, Sola, or Kemi):"""
+            response = await self.model.generate_content_async(prompt)
+            agent_raw = response.text.strip().title()
 
-            response = await self.model.generate_content_async(routing_request)
-            agent_name = response.text.strip().title()
-            
-            # Map response to AgentName enum
             agent_map = {
                 "Tolu": AgentName.TOLU,
                 "Emem": AgentName.EMEM,
                 "Sola": AgentName.SOLA,
-                "Kemi": AgentName.KEMI
+                "Kemi": AgentName.KEMI,
             }
-            
-            return agent_map.get(agent_name, AgentName.SOLA)
-            
-        except Exception as e:
-            print(f"AI routing failed, using fallback: {e}")
-            # Fallback to simple keyword matching
-            return self._fallback_routing(message)
-    
-    def _fallback_routing(self, message: str) -> AgentName:
-        """Fallback keyword-based routing if AI fails."""
-        lowercase_msg = message.lower()
-        
-        if any(w in lowercase_msg for w in ['help', 'worried', 'scared', 'career', 'resume', 'cv']):
+
+            return agent_map.get(agent_raw, AgentName.SOLA)
+
+        except (ValueError, KeyError, AttributeError) as e:
+            print(f"[ORCHESTRATOR] AI routing failed: {e}")
+            return self._fallback_routing(msg)
+
+    def _fallback_routing(self, msg: str) -> AgentName:
+        if any(w in msg for w in ["worried", "scared", "resume", "cv", "interview"]):
             return AgentName.KEMI
-        if any(w in lowercase_msg for w in ['deadline', 'brief', 'client', 'task', 'submit']):
+        if any(w in msg for w in ["deadline", "brief", "client", "task"]):
             return AgentName.EMEM
-        if any(w in lowercase_msg for w in ['salary', 'contract', 'hours', 'policy']):
+        if any(w in msg for w in ["salary", "contract", "policy", "certificate"]):
             return AgentName.TOLU
-        
         return AgentName.SOLA
-    
+
+    # ---------------------------
+    # MESSAGE ROUTING
+    # ---------------------------
+
     async def route_message(
         self,
         message: str,
         context: ChatContext,
-        chat_history: List[dict] = []
+        chat_history: Optional[List[dict]] = None
     ) -> ChatResponse:
-        """
-        Route the message to the appropriate agent and get response.
-        """
+
+        chat_history = chat_history or []
         agent = await self.determine_agent(message, context)
-        
-        # Build context dict for agent functions
+
         ctx = {
             "user_level": context.user_level,
             "track": context.track,
             "task_brief": context.task_brief,
             "deadline": context.deadline,
-            "task_id": context.task_id
+            "task_id": context.task_id,
             "cv_text": context.cv_text,
-            "bio_summary": context.bio_summary
+            "bio_summary": context.bio_summary,
         }
-        
-        # Route to appropriate agent
+
         if agent == AgentName.TOLU:
-            response_text = await tolu.respond_to_message(
-                message, ctx, chat_history, self.model
-            )
+            text = await tolu.respond_to_message(message, ctx, chat_history, self.model)
+
         elif agent == AgentName.EMEM:
-            response_text = await emem.respond_to_message(
-                message, ctx, chat_history, self.model
-            )
+            text = await emem.respond_to_message(message, ctx, chat_history, self.model)
+
         elif agent == AgentName.SOLA:
-            response_text = await sola.respond_to_message(
-                message, ctx, chat_history, self.model
-            )
+            text = await sola.respond_to_message(message, ctx, chat_history, self.model)
+
         elif agent == AgentName.KEMI:
-            response_text = await kemi.respond_to_message(
-                message, ctx, chat_history, self.model
-            )
+            text = await kemi.respond_to_message(message, ctx, chat_history, self.model)
+
         elif agent == AgentName.RECOMMENDER:
-            response = await recommender.generate_letter(
-                cv_text=context.get("cv_text", ""),
-                internship_duration_weeks=context.get("internship_duration_weeks", 12),
-                track=context.get("track", "Unknown"),
-                performance_summary=context.get("performance_summary"),
+            result = await recommender.generate_letter(
+                cv_text=context.cv_text or "",
+                internship_duration_weeks=context.internship_duration_weeks or 12,
+                track=context.track or "Unknown",
+                performance_summary=context.performance_summary,
                 model=self.model
             )
-            response_text = response.get("letter_text", "")
+            text = result.get("letter_text", "")
+
         else:
-            response_text = "I'm not sure how to help with that. Please rephrase your question."
-        
-        return ChatResponse(
-            agent=agent,
-            message=response_text,
-            metadata={"context": ctx}
-        )
-    
+            text = "I'm not sure how to help with that."
+
+        return ChatResponse(agent=agent, message=text, metadata={"context": ctx})
+
+    # ---------------------------
+    # DIRECT ROUTES
+    # ---------------------------
+
     async def assess_bio(self, bio_text: str, track: str) -> dict:
-        """
-        Route bio assessment to Tolu.
-        """
         return await tolu.assess_bio(bio_text, track, self.model)
-    
+
     async def review_submission(
         self,
         task_title: str,
@@ -187,80 +167,77 @@ Which agent should respond? Reply with ONLY the agent name (Tolu, Emem, Sola, or
         submission_content: str,
         client_constraints: Optional[str] = None
     ) -> dict:
-        """
-        Route submission review to Sola.
-        """
-        review_result = await sola.review_submission(
-            task_title, task_brief, submission_content, client_constraints, self.model
+
+        review = await sola.review_submission(
+            task_title,
+            task_brief,
+            submission_content,
+            client_constraints,
+            self.model
         )
-        
-        # If passed, get Kemi to translate to CV bullet
-        if review_result.get("passed", False):
-            cv_bullet = await kemi.translate_to_cv_bullet(
-                task_title, task_brief, submission_content, self.model
+
+        if review.get("passed"):
+            review["portfolio_bullet"] = await kemi.translate_to_cv_bullet(
+                task_title,
+                task_brief,
+                submission_content,
+                self.model
             )
-            review_result["portfolio_bullet"] = cv_bullet
-        
-        return review_result
-    
+
+        return review
+
     async def generate_client_interruption(
         self,
         current_task: str,
         interruption_type: str = "scope_change"
     ) -> str:
-        """
-        Generate a realistic mid-task client interruption (the "Moving Target").
-        """
         return await emem.generate_client_interruption(
-            current_task, interruption_type, self.model
+            current_task,
+            interruption_type,
+            self.model
         )
-    
+
     async def interrogate_submission(
         self,
         submission_content: str,
         approach_used: str
     ) -> str:
-        """
-        Sola's Socratic Defense - interrogate the user's choices.
-        """
         return await sola.interrogate_submission(
-            submission_content, approach_used, self.model
+            submission_content,
+            approach_used,
+            self.model
         )
-    
-    async def get_soft_skills_feedback(
-        self,
-        recent_interactions: List[dict]
-    ) -> str:
-        """
-        Get Kemi's soft skills feedback based on recent interactions.
-        """
+
+    async def get_soft_skills_feedback(self, recent_interactions: List[dict]) -> str:
         return await kemi.provide_soft_skills_feedback(
-            recent_interactions, self.model
+            recent_interactions,
+            self.model
         )
-    
+
     async def conduct_mock_interview(
         self,
         interview_type: str,
         question_number: int,
         previous_answer: Optional[str] = None
     ) -> dict:
-        """
-        Conduct a mock interview session with Kemi.
-        """
         return await kemi.conduct_mock_interview(
-            interview_type, question_number, previous_answer, self.model
+            interview_type,
+            question_number,
+            previous_answer,
+            self.model
         )
+
     async def generate_recommendation_letter(
-    self,
-    cv_text: str,
-    internship_duration_weeks: int,
-    track: str,
-    performance_summary: Optional[str] = None
-) -> dict:
-    return await recommender.generate_letter(
-        cv_text,
-        internship_duration_weeks,
-        track,
-        performance_summary,
-        self.model
-    )
+        self,
+        cv_text: str,
+        internship_duration_weeks: int,
+        track: str,
+        performance_summary: Optional[str] = None
+    ) -> dict:
+        return await recommender.generate_letter(
+            cv_text,
+            internship_duration_weeks,
+            track,
+            performance_summary,
+            self.model
+        )

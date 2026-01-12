@@ -295,9 +295,10 @@ def generate_task(
         ethical_trap = generate_ethical_trap(track_key)
         brief += f"\n\n**⚠️ ETHICAL CONSIDERATION:**\n{ethical_trap['scenario']}\n"
     
-    # deadline
+    # deadline - 1 day
     duration_days = 1
     deadline = now + timedelta(days=duration_days)
+    deadline_display = "In 1 day"
 
     # --- Resource selection ---
     resources = select_task_resources(brief, track_key)
@@ -313,6 +314,7 @@ def generate_task(
         "difficulty": difficulty,
         "client_constraints": template.get("constraints"),
         "deadline": deadline.isoformat(),
+        "deadline_display": deadline_display,
         "attachments": [],
         "ai_persona_config": {
             "role": "Supervisor",

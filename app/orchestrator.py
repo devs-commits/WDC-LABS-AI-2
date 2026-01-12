@@ -17,24 +17,56 @@ class Orchestrator:
     def __init__(self, model: genai.GenerativeModel):
         self.model = model
 
-        self.router_prompt = """You are an intelligent message router for a virtual office training system.
+        self.router_prompt = """You are an intelligent message categorizer for a virtual office training system.
 
-AGENTS:
-- Tolu (Onboarding / HR / Admin / Policies / Certificates / Recommendations)
-- Emem (Project Manager: tasks, deadlines, briefs, deliverables, clients)
-- Sola (Technical Supervisor: code, debugging, reviews, submissions)
-- Kemi (Career Coach: CVs, interviews, confidence, emotional support)
+Your job is to DETECT the category of the user's message and respond with ONLY the agent name.
 
-ROUTING RULES (STRICT):
-1. Work submissions or reviews → Sola
-2. Emotional support, CV, interview prep → Kemi
-3. Tasks, deadlines, briefs → Emem
-4. HR, admin, certificates, recommendations → Tolu
-5. Technical help → Sola
-6. Default → Sola
+AGENT CATEGORIES:
 
-Respond with ONLY one word:
-Tolu, Emem, Sola, or Kemi
+**TOLU** (Onboarding Officer) - Handles:
+- Initial setup, CV/bio assessment
+- HR policies, contracts, salary questions
+- Certificate requests, program info
+- Recommendation letters
+
+**EMEM** (Project Manager) - Handles:
+- Task assignments and briefs
+- Deadlines, deliverables, scope
+- Client requirements and constraints
+- Project changes or interruptions
+- Work planning questions
+
+**SOLA** (Technical Supervisor) - Handles:
+- Code reviews, debugging help
+- Technical problem-solving
+- Work submissions and feedback
+- Technical error explanation
+
+**KEMI** (Career Coach) - Handles:
+- CV/resume feedback
+- Interview preparation
+- Career advice, confidence building
+- Emotional support, struggle handling
+- Portfolio translation
+
+DETECTION LOGIC (in priority order):
+1. If message contains submission → Sola
+2. If message shows emotional struggle, fear, confidence issue → Kemi
+3. If message asks about CV, interview, career → Kemi
+4. If message mentions task, deadline, project scope → Emem
+5. If message asks for technical help, debugging → Sola
+6. If message about HR, admin, policies → Tolu
+7. Default → Sola
+
+OUTPUT FORMAT:
+Respond with ONLY one word agent name - no explanation:
+Tolu
+or
+Emem
+or
+Sola
+or
+Kemi
 """
 
     # ---------------------------
@@ -44,7 +76,7 @@ Tolu, Emem, Sola, or Kemi
     async def determine_agent(self, message: str, context: ChatContext) -> AgentName:
         msg = message.lower()
 
-        # HARD RULES (NO AI)
+        # HARD RULES (NO AI NEEDED - CERTAINTY)
         if context.is_submission:
             return AgentName.SOLA
 
@@ -60,12 +92,12 @@ Tolu, Emem, Sola, or Kemi
         ]):
             return AgentName.RECOMMENDER
 
-        # AI ROUTING
+        # AI-POWERED CATEGORY DETECTION
         try:
             context_info = f"""
 User Level: {context.user_level or 'Unknown'}
 Track: {context.track or 'Unknown'}
-Task: {context.task_brief or 'None'}
+Active Task: {context.task_brief or 'None'}
 """
 
             prompt = f"""{self.router_prompt}
@@ -75,6 +107,8 @@ CONTEXT:
 
 USER MESSAGE:
 {message}
+
+Detect the appropriate agent category and respond with ONLY the agent name.
 """
 
             response = await self.model.generate_content_async(prompt)
@@ -87,20 +121,57 @@ USER MESSAGE:
                 "Kemi": AgentName.KEMI,
             }
 
-            return agent_map.get(agent_raw, AgentName.SOLA)
+            detected_agent = agent_map.get(agent_raw, None)
+            
+            # If AI detection failed, use fallback
+            if detected_agent is None:
+                print(f"[ORCHESTRATOR] AI detection unclear: '{agent_raw}' - using fallback")
+                return self._fallback_routing(msg)
+            
+            return detected_agent
 
         except (ValueError, KeyError, AttributeError) as e:
-            print(f"[ORCHESTRATOR] AI routing failed: {e}")
+            print(f"[ORCHESTRATOR] AI detection failed: {e} - using fallback")
             return self._fallback_routing(msg)
 
     def _fallback_routing(self, msg: str) -> AgentName:
-        if any(w in msg for w in ["worried", "scared", "resume", "cv", "interview"]):
-            return AgentName.KEMI
-        if any(w in msg for w in ["deadline", "brief", "client", "task"]):
-            return AgentName.EMEM
-        if any(w in msg for w in ["salary", "contract", "policy", "certificate"]):
-            return AgentName.TOLU
-        return AgentName.SOLA
+        """Fallback routing using heuristic rules (safe & reliable)"""
+        
+        # Emotional/Career support keywords
+        emotional_keywords = ["worried", "scared", "help", "struggle", "stuck", "confused", "lost", "scared", "anxious", "stressed"]
+        career_keywords = ["resume", "cv", "interview", "portfolio", "career", "confidence", "skill", "growth", "job"]
+        
+        # Task/Project keywords
+        task_keywords = ["deadline", "brief", "task", "project", "client", "deliverable", "submit", "due", "when"]
+        
+        # Technical keywords
+        tech_keywords = ["code", "debug", "error", "bug", "function", "variable", "syntax", "python", "javascript", "fix"]
+        
+        # HR/Admin keywords
+        hr_keywords = ["salary", "contract", "policy", "certificate", "certificate", "onboarding", "admin", "hours", "leave"]
+        
+        # Count keyword matches
+        emotional_count = sum(1 for k in emotional_keywords if k in msg)
+        career_count = sum(1 for k in career_keywords if k in msg)
+        task_count = sum(1 for k in task_keywords if k in msg)
+        tech_count = sum(1 for k in tech_keywords if k in msg)
+        hr_count = sum(1 for k in hr_keywords if k in msg)
+        
+        # Route based on highest score
+        scores = {
+            AgentName.KEMI: emotional_count + career_count,
+            AgentName.EMEM: task_count,
+            AgentName.SOLA: tech_count,
+            AgentName.TOLU: hr_count
+        }
+        
+        best_agent = max(scores, key=scores.get)
+        
+        # If no clear winner, default to Sola (technical)
+        if all(v == 0 for v in scores.values()):
+            return AgentName.SOLA
+        
+        return best_agent
 
     # ---------------------------
     # MESSAGE ROUTING

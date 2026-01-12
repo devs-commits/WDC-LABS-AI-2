@@ -7,6 +7,7 @@ Includes ethical training scenarios and compliance checks.
 import random
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
+from app.utils.deadline_formatter import format_deadline_display
 
 # --- Industry contexts for task variation ---
 INDUSTRIES = [
@@ -298,7 +299,7 @@ def generate_task(
     # deadline - 1 day
     duration_days = 1
     deadline = now + timedelta(days=duration_days)
-    deadline_display = "In 1 day"
+    deadline_display = format_deadline_display(deadline.isoformat())
 
     # --- Resource selection ---
     resources = select_task_resources(brief, track_key)

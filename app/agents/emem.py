@@ -1,6 +1,7 @@
 import google.generativeai as genai
 from pathlib import Path
 from typing import Optional, List
+from app.utils.deadline_formatter import format_deadline_display
 
 # Load prompt from file
 PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "emem.txt"
@@ -96,11 +97,8 @@ async def respond_to_message(
     current_task = context.get("task_brief", "No active task")
     deadline = context.get("deadline", "Not set")
     
-    # Format deadline display as "In 1 day" consistently
-    if deadline and deadline != "Not set":
-        deadline_display = "In 1 day"
-    else:
-        deadline_display = deadline
+    # Format deadline display using helper function
+    deadline_display = format_deadline_display(deadline) if deadline != "Not set" else deadline
 
     prompt = f"""
 {system_prompt}

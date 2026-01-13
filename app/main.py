@@ -261,10 +261,16 @@ def generate_tasks(req: TaskRequest):
     )
     return {"tasks": [task]}
 
-# ============ STARTUP ============
+# ============ STARTUP ============ 
 
 @app.on_event("startup")
 async def startup_event():
     print("🚀 WDC Labs AI Backend starting...")
     print("✅ Gemini configured")
     print("✅ Orchestrator ready")
+
+
+# ============ HEALTH CHECK ============ 
+@app.get("/health")
+def health():
+    return "ok"

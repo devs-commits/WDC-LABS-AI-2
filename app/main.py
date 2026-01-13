@@ -30,6 +30,7 @@ from app.schemas import (
     OnboardingIntroMessage, AgentName
 )
 from app.task_templates import generate_task
+from app.utils.file_extractor import extract_text_from_file
 
 
 # Load environment variables
@@ -197,51 +198,50 @@ async def generate_onboarding_intro(request: OnboardingIntroRequest):
 @app.post("/review-submission", response_model=SubmissionReviewResponse)
 async def review_submission(request: SubmissionReviewRequest):
     try:
-        prompt = f"""
-        Review intern submission:
-        Task: {request.task_title}
-        Brief: {request.task_brief}
-        Notes: {request.file_content}
-        """
-
-        content = [prompt]
-
+        # Extract file content if URL is provided
+        file_content = request.file_content or ""
+        
         if request.file_url and request.file_url.startswith("http"):
-            res = requests.get(request.file_url, timeout=30)
-            if res.status_code == 200:
-                mime, _ = mimetypes.guess_type(request.file_url)
-                if mime and mime.startswith("image"):
-                    content.append({"mime_type": mime, "data": res.content})
-                elif mime == "application/pdf":
-                    content.append({"mime_type": mime, "data": res.content})
-                else:
-                    try:
-                        content.append(res.content.decode("utf-8"))
-                    except (UnicodeDecodeError, AttributeError):
-                        pass
-
-        response = model.generate_content(content)
-
-        match = re.search(r"\{.*\}", response.text, re.DOTALL)
-        if not match:
-            return SubmissionReviewResponse(
-                feedback="Could not parse review.",
-                passed=False,
-                score=0
-            )
-
-        data = json.loads(match.group())
+            try:
+                res = requests.get(request.file_url, timeout=30)
+                if res.status_code == 200:
+                    mime, _ = mimetypes.guess_type(request.file_url)
+                    
+                    # Use universal file extractor
+                    extracted = extract_text_from_file(
+                        file_url=request.file_url,
+                        file_content_bytes=res.content,
+                        mime_type=mime
+                    )
+                    
+                    if extracted and extracted != "[Binary file - cannot extract text]":
+                        file_content = extracted
+                    else:
+                        file_content += "\n[File uploaded - format not readable]"
+                        
+            except Exception as e:
+                file_content += f"\n[Error reading file: {str(e)}]"
+        
+        # Call Sola's review function through orchestrator
+        result = await orchestrator.review_submission(
+            task_title=request.task_title,
+            task_brief=request.task_brief,
+            submission_content=file_content or request.file_content or "No content provided",
+            client_constraints=None
+        )
+        
         return SubmissionReviewResponse(
-            feedback=data.get("feedback"),
-            passed=data.get("passed"),
-            score=data.get("score"),
-            portfolio_bullet=data.get("portfolio_bullet")
+            feedback=result.get("feedback", "Unable to generate review"),
+            passed=result.get("passed", False),
+            score=result.get("score", 0),
+            portfolio_bullet=result.get("portfolio_bullet")
         )
 
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        print(f"[ERROR] Review submission failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Review failed: {str(e)}") from e
 
 # ============ TASK GENERATION ============
 

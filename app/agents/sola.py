@@ -43,11 +43,15 @@ async def review_submission(
     Review a user's submission as Sola (Technical Lead).
     
     Implements the 60% Rejection Rule - rejects unless work is excellent.
+    Handles both text submissions and file content.
     
     Returns:
         dict with feedback, passed (bool), score (0-100), improvement_points
     """
     system_prompt = get_system_prompt()
+    
+    # Truncate very long submissions to avoid token limits
+    submission_preview = submission_content[:3000] if len(submission_content) > 3000 else submission_content
     
     prompt = f"""
 {system_prompt}
@@ -61,7 +65,7 @@ Client Constraints: {client_constraints or "None specified"}
 
 **USER'S SUBMISSION:**
 \"\"\"
-{submission_content}
+{submission_preview}
 \"\"\"
 
 **REVIEW INSTRUCTIONS:**
@@ -71,39 +75,59 @@ Client Constraints: {client_constraints or "None specified"}
 4. Check formatting and professionalism
 5. Apply the 60% Rejection Rule - only approve truly excellent work
 
-Respond with JSON:
-{{
-    "feedback": "Your detailed feedback message",
-    "passed": true | false,
-    "score": 0-100,
-    "improvement_points": ["Point 1", "Point 2"] // Only if failed
-}}
+IMPORTANT: Respond ONLY with valid JSON on a single line (no markdown, no code blocks):
+{{"feedback": "Your detailed feedback message", "passed": true, "score": 85, "improvement_points": ["Point 1", "Point 2"]}}
 
 Remember: You reject 60% of first drafts. Be thorough but fair.
 """
 
-    response = await model.generate_content_async(prompt)
-    
-    # Parse JSON from response
     try:
+        response = await model.generate_content_async(prompt)
         text = response.text.strip()
-        if text.startswith("```json"):
-            text = text[7:]
-        if text.startswith("```"):
-            text = text[3:]
-        if text.endswith("```"):
-            text = text[:-3]
         
-        result = json.loads(text.strip())
-        return result
-    except json.JSONDecodeError:
-        # Fallback - assume rejection if parsing fails
-        return {
-            "feedback": response.text,
-            "passed": False,
-            "score": 50,
-            "improvement_points": ["Please resubmit with clearer formatting"]
-        }
+        # Remove markdown code blocks if present
+        if text.startswith("```"):
+            # Find the closing ```
+            lines = text.split('\n')
+            if len(lines) > 1:
+                # Remove first line (opening ```)
+                text = '\n'.join(lines[1:])
+                # Remove last line if it's closing ```
+                if text.endswith("```"):
+                    text = text[:-3]
+        
+        # Try to find JSON in the text
+        import re
+        json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
+        
+        if json_match:
+            json_str = json_match.group(0)
+            result = json.loads(json_str)
+            
+            # Validate required fields
+            if isinstance(result, dict) and "feedback" in result and "passed" in result:
+                # Ensure score is present
+                if "score" not in result:
+                    result["score"] = 50
+                return result
+        
+        # If no valid JSON found, try to parse the whole text
+        result = json.loads(text)
+        if isinstance(result, dict) and "feedback" in result and "passed" in result:
+            if "score" not in result:
+                result["score"] = 50
+            return result
+            
+    except (json.JSONDecodeError, AttributeError, IndexError) as e:
+        pass
+    
+    # Fallback - return a generic response with the AI's feedback
+    return {
+        "feedback": response.text if response else "Unable to generate review. Please resubmit with clearer content.",
+        "passed": False,
+        "score": 0,
+        "improvement_points": ["Please ensure submission is clear and complete", "Resubmit for review"]
+    }
 
 
 async def respond_to_message(

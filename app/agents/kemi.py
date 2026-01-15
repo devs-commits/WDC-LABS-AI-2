@@ -13,6 +13,11 @@ def get_system_prompt() -> str:
         return f.read()
 
 
+def respond(message: str, context: dict | None = None) -> str:
+    """Simple response placeholder for Kemi."""
+    return "Kemi response placeholder"
+
+
 async def translate_to_cv_bullet(
     task_title: str,
     task_description: str,
@@ -155,52 +160,71 @@ async def conduct_mock_interview(
     model: genai.GenerativeModel
 ) -> dict:
     """
-    Conduct a mock interview session.
-    
-    interview_type: 'behavioral', 'technical', 'situational'
-    
-    Returns:
-        dict with question, follow_up (if applicable), tip
+    Conduct a realistic mock interview.
+    Kemi must stay in interviewer mode until the interview ends.
     """
+
     system_prompt = get_system_prompt()
-    
-    prompt = f"""
-{system_prompt}
 
----
+    # Define interview length
+    TOTAL_QUESTIONS = 5
 
-**MOCK INTERVIEW SESSION**
-Type: {interview_type}
-Question Number: {question_number}
-{"Previous Answer: " + previous_answer if previous_answer else "This is the first question."}
+    # Interviewer behavior rules
+    interviewer_rules = """
+You are acting as a real interviewer.
 
-{"If they provided an answer, briefly evaluate it (1 sentence) then ask a follow-up or next question." if previous_answer else ""}
-
-Generate an interview question appropriate for an entry-level tech role.
-Be professional - this is practice for real interviews.
-
-Respond with JSON:
-{{
-    "evaluation": "Brief feedback on previous answer (if applicable)",
-    "question": "The interview question",
-    "tip": "A brief tip for answering this type of question"
-}}
+Rules:
+- Ask ONE question at a time
+- Do NOT give feedback, praise, or coaching during the interview
+- If an answer is vague, ask a brief follow-up
+- Maintain a neutral, professional tone
+- Slight pressure is acceptable
 """
 
-    response = await model.generate_content_async(prompt)
-    
-    try:
-        text = response.text.strip()
-        if text.startswith("```json"):
-            text = text[7:]
-        if text.startswith("```"):
-            text = text[3:]
-        if text.endswith("```"):
-            text = text[:-3]
-        
-        return json.loads(text.strip())
-    except json.JSONDecodeError:
+    # Final feedback mode
+    if question_number > TOTAL_QUESTIONS:
+        feedback_prompt = f"""
+{system_prompt}
+
+You are now out of interview mode.
+
+Based on the candidate’s answers, provide:
+1. Overall assessment (2–3 sentences)
+2. Strengths (bullet points)
+3. Weaknesses / gaps (bullet points)
+4. Hiring signal: Weak / Borderline / Strong
+
+Be honest. No encouragement fluff.
+"""
+
+        response = await model.generate_content_async(feedback_prompt)
         return {
-            "question": "Tell me about a time you faced a challenging deadline.",
-            "tip": "Use the STAR method: Situation, Task, Action, Result"
+            "stage": "feedback",
+            "content": response.text
         }
+
+    # Normal interview question
+    interview_prompt = f"""
+{system_prompt}
+
+{interviewer_rules}
+
+Interview Type: {interview_type}
+Question Number: {question_number} of {TOTAL_QUESTIONS}
+
+Previous Answer:
+\"\"\"
+{previous_answer or "N/A"}
+\"\"\"
+
+Ask the next interview question.
+If the previous answer was vague, ask a follow-up instead.
+"""
+
+    response = await model.generate_content_async(interview_prompt)
+
+    return {
+        "stage": "question",
+        "question_number": question_number,
+        "content": response.text
+    }

@@ -277,7 +277,8 @@ def generate_tasks(req: TaskRequest):
         track=req.track,
         difficulty=req.experience_level.lower(),
         task_number=req.task_number,
-        user_city=req.user_city
+        user_city=req.user_city,
+        model=model # Pass the AI model for content generation
     )
     return {"tasks": [task]}
 

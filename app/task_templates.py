@@ -193,24 +193,176 @@ Provide specific recommendations with priority rankings.
     ]
 }
 
-# --- Resource selection from internal archive ---
-ARCHIVE_LIBRARY = {
-    "data_analytics": [
-        {"id": "da_guide_01", "title": "Pandas Cheat Sheet", "tags": ["csv", "data", "cleaning"]},
-        {"id": "da_guide_02", "title": "ROAS Calculation Template", "tags": ["roas", "financial", "metrics"]}
-    ],
-    "digital_marketing": [
-        {"id": "dm_guide_01", "title": "SEO Basics PDF", "tags": ["seo", "audit", "website"]},
-        {"id": "dm_guide_02", "title": "Social Media Campaign Template", "tags": ["campaign", "social", "calendar"]}
-    ],
-    "cybersecurity": [
-        {"id": "cyber_guide_01", "title": "Vulnerability Checklist", "tags": ["vulnerability", "network", "assessment"]},
-        {"id": "cyber_guide_02", "title": "Security Policy Template", "tags": ["policy", "review", "access"]}
-    ],
-    "general": [
-        {"id": "general_01", "title": "Reference Hint Document", "tags": []}
-    ]
+# --- Resource Content Library (Markdown) ---
+RESOURCE_CONTENT = {
+    "da_guide_01": """
+# Pandas Cheat Sheet for Data Cleaning
+
+## 1. Handling Missing Data
+```python
+# Check for null values
+df.isnull().sum()
+
+# Drop rows with nulls
+df.dropna()
+
+# Fill nulls with mean/median
+df['column'].fillna(df['column'].mean(), inplace=True)
+```
+
+## 2. Removing Duplicates
+```python
+# Check duplicates
+df.duplicated().sum()
+
+# Drop duplicates
+df.drop_duplicates(inplace=True)
+```
+
+## 3. Data Type Conversion
+```python
+# Convert to datetime
+df['date'] = pd.to_datetime(df['date'])
+
+# Convert to numeric
+df['sales'] = pd.to_numeric(df['sales'], errors='coerce')
+```
+""",
+    "da_guide_02": """
+# ROAS Calculation Template
+
+**Formula:**
+$$ ROAS = \\frac{\\text{Revenue from Ad}}{\\text{Cost of Ad}} $$
+
+## Steps to Calculate
+1. **Clean Revenue Data**: Ensure currency symbols are removed and values are numeric.
+2. **Clean Cost Data**: Handle any missing or zero cost entries (avoid division by zero).
+3. **Calculate per Campaign**:
+   ```python
+   df['ROAS'] = df['revenue'] / df['cost']
+   ```
+4. **Benchmark**:
+   - ROAS < 4: Poor
+   - ROAS > 4: Good
+   - ROAS > 8: Excellent
+""",
+    "dm_guide_01": """
+# SEO Basics: Technical Audit Checklist
+
+## 1. Crawlability
+- [ ] Check robots.txt (is it blocking important pages?)
+- [ ] Verify XML Sitemap existence
+- [ ] Check for 404 errors (Broken links)
+
+## 2. On-Page Elements
+- [ ] Title Tags: Are they unique and under 60 chars?
+- [ ] Meta Descriptions: Do they exist and encourage clicks?
+- [ ] H1 Tags: One per page, containing primary keyword.
+
+## 3. Performance
+- [ ] Page Load Speed (< 3s is ideal)
+- [ ] Mobile Responsiveness check
+- [ ] Image Optimization (Alt tags + sizing)
+""",
+    "dm_guide_02": """
+# Social Media Campaign Template
+
+## Campaign Overview
+- **Goal**: [Brand Awareness / Conversion / Engagement]
+- **Target Audience**: [Demographics / Interests]
+- **Duration**: [Start Date] - [End Date]
+
+## Platform Strategy
+### Instagram (Visuals)
+- Feed Posts: 3x per week (High quality product shots)
+- Stories: Daily (Behind the scenes, Polls)
+- Reels: 2x per week (Trends, Educational)
+
+### LinkedIn (Professional)
+- Thought Leadership: 1x per week
+- Company Updates: 1x per week
+
+## KPI Tracking
+| Metric | Goal |
+|--------|------|
+| Impressions | 10,000 |
+| Clicks | 500 |
+| Engagement Rate | 3.5% |
+""",
+    "cyber_guide_01": """
+# Vulnerability Assessment Checklist
+
+## Network Security
+1. **Firewall Configuration**: Are default ports closed?
+2. **Access Control**: Is Least Privilege enforced?
+3. **Wi-Fi**: Is WPA3 encryption enabled?
+
+## System Hardening
+1. **Patch Management**: Are all systems updated?
+2. **Default Accounts**: Have default passwords been changed?
+3. **Services**: Are unnecessary services disabled?
+
+## Monitoring
+1. Is logging enabled?
+2. Are alerts configured for suspicious activity?
+""",
+    "cyber_guide_02": """
+# Security Policy Template Structure
+
+1. **Purpose**: Why does this policy exist?
+2. **Scope**: Who and what does it apply to?
+3. **Policy Statement**: The core rules.
+   - *Password Requirements*: (Length, complexity, rotation)
+   - *Access Control*: (RBAC, MFA)
+   - *Data Handling*: (Classification, encryption)
+4. **Enforcement**: Penalties for non-compliance.
+5. **Review Cycle**: How often is this updated?
+""",
+    "general_01": """
+# Reference Hint Document
+
+## How to Approach This Task
+1. **Read the Brief Carefully**: Identify the key deliverables.
+2. **Check Constraints**: Are there format or tool restrictions?
+3. **Plan Your Steps**: Break the problem down.
+4. **Validate**: Double-check your work against the requirements.
+
+## Troubleshooting
+- **Missing Data?** Document it as a finding.
+- **Ambiguous Instructions?** Make a reasonable assumption and state it clearly.
+- **Stuck?** Check the specific guides for your track.
+"""
 }
+
+RESOURCE_METADATA = [
+    {"id": "da_guide_01", "title": "Pandas Cheat Sheet", "type": "code", "tags": ["csv", "data", "cleaning"], "track": "data_analytics"},
+    {"id": "da_guide_02", "title": "ROAS Calculation Template", "type": "sheet", "tags": ["roas", "financial", "metrics"], "track": "data_analytics"},
+    {"id": "dm_guide_01", "title": "SEO Basics PDF", "type": "pdf", "tags": ["seo", "audit", "website"], "track": "digital_marketing"},
+    {"id": "dm_guide_02", "title": "Social Media Campaign Template", "type": "doc", "tags": ["campaign", "social", "calendar"], "track": "digital_marketing"},
+    {"id": "cyber_guide_01", "title": "Vulnerability Checklist", "type": "sheet", "tags": ["vulnerability", "network", "assessment"], "track": "cybersecurity"},
+    {"id": "cyber_guide_02", "title": "Security Policy Template", "type": "doc", "tags": ["policy", "review", "access"], "track": "cybersecurity"},
+    {"id": "general_01", "title": "General Task Workflow", "type": "doc", "tags": [], "track": "general"}
+]
+
+# Build the Archive Library map for easy lookup
+ARCHIVE_LIBRARY = {
+    "data_analytics": [],
+    "digital_marketing": [],
+    "cybersecurity": [],
+    "general": []
+}
+
+for meta in RESOURCE_METADATA:
+    # Add content relative to ID
+    item = {
+        "id": meta["id"],
+        "title": meta["title"],
+        "tags": meta["tags"],
+        "content": RESOURCE_CONTENT.get(meta["id"], "Content not found.")
+    }
+    
+    if meta["track"] in ARCHIVE_LIBRARY:
+        ARCHIVE_LIBRARY[meta["track"]].append(item)
 
 def select_task_resources(task_brief: str, track: str) -> list:
     """
@@ -234,7 +386,8 @@ def generate_task(
     difficulty: str = "intermediate",
     task_number: int = 1,
     user_city: str = None,
-    include_ethical_trap: bool = None
+    include_ethical_trap: bool = None,
+    model = None
 ) -> Dict[str, Any]:
     """
     Generate a unique, ungoogleable task based on track and difficulty.
@@ -279,16 +432,86 @@ def generate_task(
     ]
     
     # Format the template
-    title = template["title_template"].format(company=company, industry=industry, city=city)
-    brief = template["brief_template"].format(
-        company=company,
-        industry=industry,
-        city=city,
-        month=month,
-        year=year,
-        anomaly_count=random.randint(2, 5),
-        error_cause=random.choice(error_causes)
-    )
+    # CHECK FOR CURRICULUM OVERRIDE
+    from app.curriculum import get_curriculum_step
+    curriculum = get_curriculum_step(track_key, task_number)
+
+    if curriculum and model:
+        # Generate fully dynamic task based on curriculum
+        company = generate_company_name(industry)
+        
+        prompt = f"""
+        Generate a detailed task brief for an intern at a {industry} company named {company}.
+        
+        **Curriculum Logic:**
+        - Task Number: {task_number}
+        - Topic: {curriculum['topic']}
+        - Learning Objective: {curriculum['objective']}
+        - Key Concepts to Test: {', '.join(curriculum['key_concepts'])}
+        
+        **Context:**
+        - City: {city}
+        - Current Date: {month} {year}
+        
+        **Instructions:**
+        Create a realistic workplace scenario (Task Title and Brief).
+        The intern should feel like they are solving a real problem for the business.
+        Include specific data points or file references (e.g., "attached sales_data.csv").
+        
+        **Output Format (JSON):**
+        {{
+            "title": "Professional Task Title",
+            "brief_template": "Full markdown brief...",
+            "constraints": "Specific constraints..."
+        }}
+        """
+        
+        try:
+            response = model.generate_content(prompt)
+            # Simple cleanup to find JSON
+            import json
+            import re
+            match = re.search(r"\{.*\}", response.text, re.DOTALL)
+            if match:
+                gen_data = json.loads(match.group())
+                title = gen_data.get("title")
+                brief = gen_data.get("brief_template")
+                template["constraints"] = gen_data.get("constraints") # Override constrains
+            else:
+                 raise ValueError("Failed to parse AI curriculum task")
+                 
+        except Exception as e:
+            print(f"Curriculum generation failed: {e}. Falling back to curriculum-static mode.")
+            # Fallback to Curriculum Static Mode (prevents random tasks)
+            title = f"{curriculum['topic']}: {company}"
+            brief = f"""
+**Topic:** {curriculum['topic']}
+**Objective:** {curriculum['objective']}
+
+**Context:**
+You are working at {company} in {city}.
+The manager needs you to complete the objective above.
+
+**Key Concepts:**
+- {', '.join(curriculum['key_concepts'])}
+
+**Instructions:**
+Complete the objective using the tools provided.
+"""
+            template["constraints"] = "Standard professional constraints apply."
+
+    else:
+        # STANDARD TEMPLATE LOGIC
+        title = template["title_template"].format(company=company, industry=industry, city=city)
+        brief = template["brief_template"].format(
+            company=company,
+            industry=industry,
+            city=city,
+            month=month,
+            year=year,
+            anomaly_count=random.randint(2, 5),
+            error_cause=random.choice(error_causes)
+        )
     
     # ADD ETHICAL TRAP IF APPLICABLE
     ethical_trap = None
@@ -302,11 +525,53 @@ def generate_task(
     deadline_display = format_deadline_display(deadline.isoformat())
 
     # --- Resource selection ---
-    resources = select_task_resources(brief, track_key)
-    educational_resources = [
-        {"title": r["title"], "description": "Reference hint from internal archive", "content": r["id"]}
-        for r in resources
-    ]
+
+    # --- Resource selection ---
+    # Pick relevant metadata first
+    resource_metadata = select_task_resources(brief, track_key)
+    
+    educational_resources = []
+    
+    # If model is available, use AI to generate the content dynamically
+    if model:
+        for meta in resource_metadata:
+            try:
+                # Generate dynamic content based on title, brief, and industry context
+                prompt = f"""
+                Create a practical, short "Cheat Sheet" or "Guide" for an intern working on this task:
+                
+                Task: {title}
+                Industry: {industry}
+                Topic: {meta['title']}
+                Tags: {meta['tags']}
+                
+                The content should be in Markdown format.
+                Include code snippets (if technical), checklists, or step-by-step instructions.
+                Keep it under 300 words. Make it look like a real internal document.
+                """
+                
+                response = model.generate_content(prompt)
+                content = response.text
+                
+                educational_resources.append({
+                    "title": meta["title"],
+                    "description": f"AI-Generated Resource for {company}",
+                    "content": content
+                })
+            except Exception as e:
+                print(f"Error generating resource content: {e}")
+                # Fallback to static content
+                educational_resources.append({
+                    "title": meta["title"],
+                    "description": f"Internal Resource ({meta['id']})",
+                    "content": RESOURCE_CONTENT.get(meta["id"], "Content not available.")
+                })
+    else:
+        # Fallback if no model provided
+        educational_resources = [
+            {"title": r["title"], "description": f"Internal Resource ({r['id']})", "content": r["content"]}
+            for r in select_task_resources(brief, track_key)
+        ]
     
     # --- Build final task dict ---
     task_dict = {

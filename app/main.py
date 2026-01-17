@@ -167,7 +167,27 @@ async def translate_to_cv(request: PortfolioBulletRequest):
 @app.post("/onboarding-intro", response_model=OnboardingIntroResponse)
 async def generate_onboarding_intro(request: OnboardingIntroRequest):
     try:
-        prompt = f"""Generate onboarding messages for {request.user_name}"""
+        prompt = f"""
+        Generate a scripted team introduction for a new intern named {request.user_name} joining the {request.track} track.
+        
+        The team consists of:
+        - Tolu (Onboarding Officer): Professional, efficient. Example: "Welcome to WDC Labs."
+        - Emem (Project Manager): Strict, deadline-driven. Example: "I need your first task by 5 PM."
+        - Sola (Tech Lead): Critical, perfectionist. Example: "I'll be reviewing your code."
+        - Kemi (Career Coach): Supportive, encouraging. Example: "I'm here to help you grow."
+
+        Create a sequence of 4-6 short messages introducing themselves.
+        
+        Return ONLY valid JSON in this format:
+        {{
+            "messages": [
+                {{ "agent": "Tolu", "message": "..." }},
+                {{ "agent": "Emem", "message": "..." }},
+                {{ "agent": "Sola", "message": "..." }},
+                {{ "agent": "Kemi", "message": "..." }}
+            ]
+        }}
+        """
         response = model.generate_content(prompt)
         match = re.search(r"\{.*\}", response.text, re.DOTALL)
 

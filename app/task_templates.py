@@ -387,6 +387,7 @@ def generate_task(
     task_number: int = 1,
     user_city: str = None,
     include_ethical_trap: bool = None,
+    user_name: str = "Intern",
     model = None
 ) -> Dict[str, Any]:
     """
@@ -441,7 +442,7 @@ def generate_task(
         company = generate_company_name(industry)
         
         prompt = f"""
-        Generate a detailed task brief for an intern at a {industry} company named {company}.
+        Generate a detailed task brief for an intern named "{user_name}" at a {industry} company named {company}.
         
         **Curriculum Logic:**
         - Task Number: {task_number}
@@ -455,6 +456,7 @@ def generate_task(
         
         **Instructions:**
         Create a realistic workplace scenario (Task Title and Brief).
+        Address the intern directly by name ("Dear {user_name}").
         The intern should feel like they are solving a real problem for the business.
         Include specific data points or file references (e.g., "attached sales_data.csv").
         
@@ -489,6 +491,7 @@ def generate_task(
 **Objective:** {curriculum['objective']}
 
 **Context:**
+Dear {user_name},
 You are working at {company} in {city}.
 The manager needs you to complete the objective above.
 

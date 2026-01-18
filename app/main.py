@@ -270,6 +270,7 @@ class TaskRequest(BaseModel):
     experience_level: str
     task_number: int
     user_city: Optional[str] = None
+    user_name: Optional[str] = "Intern"
 
 @app.post("/generate-tasks")
 def generate_tasks(req: TaskRequest):
@@ -278,6 +279,7 @@ def generate_tasks(req: TaskRequest):
         difficulty=req.experience_level.lower(),
         task_number=req.task_number,
         user_city=req.user_city,
+        user_name=req.user_name,
         model=model # Pass the AI model for content generation
     )
     return {"tasks": [task]}

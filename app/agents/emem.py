@@ -41,9 +41,8 @@ async def assign_task(
     task_title: str,
     task_brief: str,
     deadline: str,
-    deadline_display: str = "In 1 day",
-    client_constraints: Optional[str] = None,
-    model: genai.GenerativeModel = None
+    client_constraints: Optional[str],
+    model: genai.GenerativeModel
 ) -> str:
     """
     Generate Emem's task assignment message.
@@ -58,7 +57,7 @@ async def assign_task(
 **TASK TO ASSIGN:**
 Title: {task_title}
 Brief: {task_brief}
-Deadline: {deadline_display}
+Deadline: {deadline}
 Client Constraints: {client_constraints or "None specified"}
 
 Generate a short, sharp task assignment message.
@@ -96,9 +95,6 @@ async def respond_to_message(
 
     current_task = context.get("task_brief", "No active task")
     deadline = context.get("deadline", "Not set")
-    
-    # Format deadline display using helper function
-    deadline_display = format_deadline_display(deadline) if deadline != "Not set" else deadline
 
     prompt = f"""
 {system_prompt}
@@ -115,7 +111,9 @@ Expectation Guidance: {expectation_guidance}
 
 **WORK CONTEXT:**
 Current Task: {current_task}
-Deadline: {deadline_display}
+Deadline: {deadline}
+
+**RECENT CHAT:**
 {history_text}
 
 **USER MESSAGE:**

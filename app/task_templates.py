@@ -522,9 +522,11 @@ Complete the objective using the tools provided.
         ethical_trap = generate_ethical_trap(track_key)
         brief += f"\n\n**⚠️ ETHICAL CONSIDERATION:**\n{ethical_trap['scenario']}\n"
     
-    # deadline - 1 day
-    duration_days = 1
-    deadline = now + timedelta(days=duration_days)
+    # deadline - 1 day, excluding weekends
+    deadline = now + timedelta(days=1)
+    while deadline.weekday() >= 5:  # Skip Saturday (5) and Sunday (6)
+        deadline += timedelta(days=1)
+    duration_days = (deadline - now).days
     deadline_display = format_deadline_display(deadline.isoformat())
 
     # --- Resource selection ---
@@ -680,5 +682,7 @@ if __name__ == "__main__":
     task = generate_task("Data Analytics", "intermediate", 1)
     print(f"Title: {task['title']}")
     print(f"Brief: {task['brief_content'][:200]}...")
+    print(f"Deadline: {task['deadline']}")
+    print(f"Deadline Display: {task['deadline_display']}")
     print(f"Constraints: {task['client_constraints']}")
     print(f"Resources: {task['educational_resources']}")

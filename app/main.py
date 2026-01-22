@@ -27,7 +27,8 @@ from app.schemas import (
     SubmissionReviewRequest, SubmissionReviewResponse,
     PortfolioBulletRequest, PortfolioBulletResponse,
     OnboardingIntroRequest, OnboardingIntroResponse,
-    OnboardingIntroMessage, AgentName
+    OnboardingIntroMessage, AgentName,
+    ResourceGenerationRequest, ResourceGenerationResponse
 )
 from app.task_templates import generate_task
 from app.utils.file_extractor import extract_text_from_file
@@ -270,7 +271,7 @@ class TaskRequest(BaseModel):
     experience_level: str
     task_number: int
     user_city: Optional[str] = None
-    user_name: Optional[str] = "Intern"
+    user_name: str
 
 @app.post("/generate-tasks")
 def generate_tasks(req: TaskRequest):
@@ -283,6 +284,58 @@ def generate_tasks(req: TaskRequest):
         model=model # Pass the AI model for content generation
     )
     return {"tasks": [task]}
+
+# ============ RESOURCE GENERATION ============
+
+# @app.post("/generate-resource", response_model=ResourceGenerationResponse)
+# async def generate_resource(req: ResourceGenerationRequest):
+#     try:
+#         prompt = f"""
+#         Generate a helpful educational resource based on this query:
+        
+#         Query: {req.query}
+#         Track: {req.track}
+#         User Level: {req.user_level or 'General'}
+#         Task Context: {req.task_context or 'None'}
+        
+#         Create a resource with:
+#         - Title: A clear, descriptive title
+#         - Category: One word category (e.g., Tutorial, Guide, Reference, Example)
+#         - Content: Markdown-formatted content with practical information
+        
+#         Keep content under 500 words. Make it educational and relevant.
+#         Do NOT include any external links or URLs - focus on internal knowledge.
+#         """
+        
+#         response = await model.generate_content_async(prompt)
+#         content = response.text
+        
+#         # Clean any potential broken links (though we instructed not to include)
+#         from app.utils.link_verifier import clean_broken_links
+#         content = await clean_broken_links(content)
+        
+#         # Parse the response to extract title, category, content
+#         lines = content.split('\n')
+#         title = "Generated Resource"
+#         category = "Guide"
+#         content_body = content
+        
+#         for i, line in enumerate(lines):
+#             if line.startswith('Title:'):
+#                 title = line.replace('Title:', '').strip()
+#             elif line.startswith('Category:'):
+#                 category = line.replace('Category:', '').strip()
+#             elif line.startswith('Content:'):
+#                 content_body = '\n'.join(lines[i+1:]).strip()
+#                 break
+        
+#         return ResourceGenerationResponse(
+#             title=title,
+#             category=category,
+#             content=content_body
+#         )
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
 
 # ============ STARTUP ============ 
 

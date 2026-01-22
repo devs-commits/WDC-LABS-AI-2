@@ -7,6 +7,7 @@ import google.generativeai as genai
 
 from .schemas import AgentName, ChatContext, ChatResponse
 from .agents import tolu, emem, sola, kemi, recommender
+from .utils.link_verifier import clean_broken_links
 
 
 class Orchestrator:
@@ -94,6 +95,7 @@ Kemi
 
         # AI-POWERED CATEGORY DETECTION
         try:
+            # return AgentName.SOLA  # temporary
             context_info = f"""
 User Level: {context.user_level or 'Unknown'}
 Track: {context.track or 'Unknown'}
@@ -130,7 +132,7 @@ Detect the appropriate agent category and respond with ONLY the agent name.
             
             return detected_agent
 
-        except (ValueError, KeyError, AttributeError) as e:
+        except Exception as e:
             print(f"[ORCHESTRATOR] AI detection failed: {e} - using fallback")
             return self._fallback_routing(msg)
 
@@ -221,6 +223,10 @@ Detect the appropriate agent category and respond with ONLY the agent name.
 
         else:
             text = "I'm not sure how to help with that."
+
+        # Clean any broken links from the response
+        from app.utils.link_verifier import clean_broken_links_sync
+        text = clean_broken_links_sync(text)
 
         return ChatResponse(agent=agent, message=text, metadata={"context": ctx})
 

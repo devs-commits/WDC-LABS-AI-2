@@ -8,6 +8,7 @@ import random
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
 from app.utils.deadline_formatter import format_deadline_display
+from app.utils.link_verifier import clean_broken_links_sync
 
 # --- Industry contexts for task variation ---
 INDUSTRIES = [
@@ -87,15 +88,13 @@ TASK_TEMPLATES = {
         {
             "title_template": "Data Cleansing: {company} Sales Data",
             "brief_template": """
-Here is a CSV file containing sales data for {company} for {month} {year}. 
-There are {anomaly_count} anomalies in the dataset caused by {error_cause}.
-Find them and calculate the real ROAS.
+Clean {company}'s {month} {year} sales data CSV. {anomaly_count} anomalies caused by {error_cause}. Find them, fix data, calculate real ROAS.
 
-**Requirements:**
-- Identify all anomalies
-- Document what was wrong with each
-- Calculate corrected ROAS (Return on Ad Spend)
-- Provide a 3-sentence summary of findings
+**Tasks:**
+- Identify anomalies
+- Document issues  
+- Calculate corrected ROAS
+- 3-sentence summary
 """,
             "constraints": "Must use Python. No external libraries except pandas and numpy.",
             "difficulty_levels": ["beginner", "intermediate", "advanced"]
@@ -103,16 +102,12 @@ Find them and calculate the real ROAS.
         {
             "title_template": "{company} Customer Segmentation Analysis",
             "brief_template": """
-The marketing team at {company} needs to understand their customer base better.
-Analyze the provided dataset and create customer segments based on:
-- Purchase frequency
-- Average order value
-- Time since last purchase
+Analyze {company}'s customer dataset. Create segments based on purchase frequency, average order value, time since last purchase.
 
 **Deliverables:**
-1. At least 3 distinct customer segments
-2. Characteristics of each segment
-3. One marketing recommendation per segment
+1. 3+ customer segments
+2. Segment characteristics  
+3. 1 marketing recommendation per segment
 """,
             "constraints": "Analysis must be reproducible. Document your methodology.",
             "difficulty_levels": ["intermediate", "advanced"]
@@ -123,16 +118,15 @@ Analyze the provided dataset and create customer segments based on:
         {
             "title_template": "SEO Audit: {company} Website",
             "brief_template": """
-Conduct a comprehensive SEO audit for {company}'s website.
-The client is in the {industry} industry and targeting the {city} market.
+Audit {company}'s website SEO. Client in {industry}, targeting {city} market.
 
-**Audit Scope:**
-1. Technical SEO issues (at least 5)
+**Scope:**
+1. 5+ technical SEO issues
 2. On-page optimization opportunities
 3. Content gap analysis
-4. 3 competitor keywords they should target
+4. 3 competitor keywords
 
-**Note:** The website has some intentional errors. Find them.
+**Note:** Website has intentional errors. Find them.
 """,
             "constraints": "Use only free tools. Screaming Frog free version is acceptable.",
             "difficulty_levels": ["beginner", "intermediate"]
@@ -140,15 +134,15 @@ The client is in the {industry} industry and targeting the {city} market.
         {
             "title_template": "Social Media Campaign: {company} Product Launch",
             "brief_template": """
-{company} is launching a new product next month. Create a 2-week social media campaign.
+Create 2-week social media campaign for {company}'s new product launch.
 
 **Requirements:**
-- Content calendar with specific post ideas
-- Platform-specific strategies (Instagram, Twitter, LinkedIn)
+- Content calendar with post ideas
+- Platform strategies (Instagram, Twitter, LinkedIn)
 - Hashtag strategy
 - KPIs to track success
 
-**Constraint:** Budget is ₦50,000 for the entire campaign.
+**Budget:** ₦50,000 total.
 """,
             "constraints": "All content must be culturally appropriate for Nigerian audience.",
             "difficulty_levels": ["intermediate", "advanced"]
@@ -159,16 +153,15 @@ The client is in the {industry} industry and targeting the {city} market.
         {
             "title_template": "Vulnerability Assessment: {company} Network",
             "brief_template": """
-You've been engaged to assess the security posture of {company}'s network.
-Review the provided network diagram and configuration files.
+Assess {company}'s network security. Review network diagram and configs.
 
 **Identify:**
-1. At least 3 security vulnerabilities
-2. Risk level for each (High/Medium/Low)
+1. 3+ vulnerabilities
+2. Risk level (High/Medium/Low)
 3. Remediation steps
 4. Quick wins vs. long-term fixes
 
-**Note:** The configs contain some common misconfigurations. Document them.
+**Note:** Configs have common misconfigurations. Document them.
 """,
             "constraints": "Do not attempt active scanning. This is a passive assessment only.",
             "difficulty_levels": ["beginner", "intermediate", "advanced"]
@@ -176,8 +169,7 @@ Review the provided network diagram and configuration files.
         {
             "title_template": "Security Policy Review: {company}",
             "brief_template": """
-{company} just received their information security policy from legal.
-Review the document for gaps and weaknesses.
+Review {company}'s new security policy for gaps.
 
 **Focus Areas:**
 1. Password policy adequacy
@@ -185,7 +177,7 @@ Review the document for gaps and weaknesses.
 3. Data classification gaps
 4. Access control weaknesses
 
-Provide specific recommendations with priority rankings.
+Provide recommendations with priority rankings.
 """,
             "constraints": "Recommendations must be practical for a small business (under 50 employees).",
             "difficulty_levels": ["intermediate", "advanced"]
@@ -387,7 +379,7 @@ def generate_task(
     task_number: int = 1,
     user_city: str = None,
     include_ethical_trap: bool = None,
-    user_name: str = "Intern",
+    user_name: str = "Sorru",
     model = None
 ) -> Dict[str, Any]:
     """
@@ -442,7 +434,7 @@ def generate_task(
         company = generate_company_name(industry)
         
         prompt = f"""
-        Generate a detailed task brief for an intern named "{user_name}" at a {industry} company named {company}.
+        Generate a concise task brief for an intern named "{user_name}" at a {industry} company named {company}.
         
         **Curriculum Logic:**
         - Task Number: {task_number}
@@ -459,11 +451,12 @@ def generate_task(
         Address the intern directly by name ("Dear {user_name}").
         The intern should feel like they are solving a real problem for the business.
         Include specific data points or file references (e.g., "attached sales_data.csv").
+        Keep the brief concise, under 150 words.
         
         **Output Format (JSON):**
         {{
             "title": "Professional Task Title",
-            "brief_template": "Full markdown brief...",
+            "brief_template": "Concise brief...",
             "constraints": "Specific constraints..."
         }}
         """
@@ -490,16 +483,12 @@ def generate_task(
 **Topic:** {curriculum['topic']}
 **Objective:** {curriculum['objective']}
 
-**Context:**
 Dear {user_name},
-You are working at {company} in {city}.
-The manager needs you to complete the objective above.
+At {company} in {city}, complete the objective above.
 
-**Key Concepts:**
-- {', '.join(curriculum['key_concepts'])}
+**Key Concepts:** {', '.join(curriculum['key_concepts'])}
 
-**Instructions:**
-Complete the objective using the tools provided.
+Use provided tools.
 """
             template["constraints"] = "Standard professional constraints apply."
 
@@ -550,13 +539,15 @@ Complete the objective using the tools provided.
                 Topic: {meta['title']}
                 Tags: {meta['tags']}
                 
-                The content should be in Markdown format.
                 Include code snippets (if technical), checklists, or step-by-step instructions.
-                Keep it under 300 words. Make it look like a real internal document.
+                Keep it under 200 words. Make it look like a real internal document.
                 """
                 
                 response = model.generate_content(prompt)
                 content = response.text
+                
+                # Clean any broken links from the generated content
+                content = clean_broken_links_sync(content)
                 
                 educational_resources.append({
                     "title": meta["title"],

@@ -9,6 +9,7 @@ from typing import List, Dict, Any
 from datetime import datetime, timedelta
 from app.utils.deadline_formatter import format_deadline_display
 from app.utils.link_verifier import clean_broken_links_sync
+from .agents import emem
 
 # --- Industry contexts for task variation ---
 INDUSTRIES = [
@@ -18,8 +19,13 @@ INDUSTRIES = [
 
 # --- Nigerian cities for localized context ---
 NIGERIAN_CITIES = [
-    "Lagos", "Abuja", "Port Harcourt", "Kano", "Ibadan",
-    "Kaduna", "Benin City", "Enugu", "Warri", "Ilorin"
+    "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", 
+    "Bayelsa", "Benue", "Borno", "Cross River", "Delta", 
+    "Ebonyi", "Edo", "Ekiti", "Enugu", "Gombe", "Imo", 
+    "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", 
+    "Kwara", "Lagos", "Nassarawa", "Niger", "Ogun", "Ondo", 
+    "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", 
+    "Yobe", "Zamfara"
 ]
 
 # --- Company name generators ---
@@ -84,6 +90,7 @@ def inject_data_anomalies(data: List[Dict], anomaly_count: int = 3) -> tuple:
 
 # --- Task templates by track ---
 TASK_TEMPLATES = {
+    # DATA ANALYTICS
     "data_analytics": [
         {
             "title_template": "Data Cleansing: {company} Sales Data",
@@ -114,6 +121,7 @@ Analyze {company}'s customer dataset. Create segments based on purchase frequenc
         }
     ],
     
+    # DIGITAL MARKETING
     "digital_marketing": [
         {
             "title_template": "SEO Audit: {company} Website",
@@ -149,6 +157,7 @@ Create 2-week social media campaign for {company}'s new product launch.
         }
     ],
     
+    # CYBER-SECURITY
     "cybersecurity": [
         {
             "title_template": "Vulnerability Assessment: {company} Network",
@@ -185,7 +194,7 @@ Provide recommendations with priority rankings.
     ]
 }
 
-# --- Resource Content Library (Markdown) ---
+# --- Resource Content Library ---
 RESOURCE_CONTENT = {
     "da_guide_01": """
 # Pandas Cheat Sheet for Data Cleaning
@@ -363,9 +372,9 @@ def select_task_resources(task_brief: str, track: str) -> list:
     resources = []
     task_lower = task_brief.lower()
     
-    for item in ARCHIVE_LIBRARY.get(track, []):
-        if any(tag in task_lower for tag in item["tags"]):
-            resources.append(item)
+    for resource_item in ARCHIVE_LIBRARY.get(track, []):
+        if any(tag in task_lower for tag in resource_item["tags"]):
+            resources.append(resource_item)
     
     # Always add a general reference hint
     resources += ARCHIVE_LIBRARY.get("general", [])[:1]
@@ -373,14 +382,15 @@ def select_task_resources(task_brief: str, track: str) -> list:
     return resources[:3]  # max 3 resources
 
 # --- Main task generation function ---
-def generate_task(
+async def generate_task(
     track: str,
     difficulty: str = "intermediate",
     task_number: int = 1,
     user_city: str = None,
     include_ethical_trap: bool = None,
     user_name: str = "Sorru",
-    model = None
+    model = None,
+    include_video_brief: bool = True
 ) -> Dict[str, Any]:
     """
     Generate a unique, ungoogleable task based on track and difficulty.
@@ -473,9 +483,9 @@ def generate_task(
                 brief = gen_data.get("brief_template")
                 template["constraints"] = gen_data.get("constraints") # Override constrains
             else:
-                 raise ValueError("Failed to parse AI curriculum task")
+                raise ValueError("Failed to parse AI curriculum task")
                  
-        except Exception as e:
+        except (ValueError, RuntimeError, json.JSONDecodeError) as e:
             print(f"Curriculum generation failed: {e}. Falling back to curriculum-static mode.")
             # Fallback to Curriculum Static Mode (prevents random tasks)
             title = f"{curriculum['topic']}: {company}"
@@ -518,7 +528,6 @@ Use provided tools.
     duration_days = (deadline - now).days
     deadline_display = format_deadline_display(deadline.isoformat())
 
-    # --- Resource selection ---
 
     # --- Resource selection ---
     # Pick relevant metadata first
@@ -528,7 +537,7 @@ Use provided tools.
     
     # If model is available, use AI to generate the content dynamically
     if model:
-        for meta in resource_metadata:
+        for resource_meta in resource_metadata:
             try:
                 # Generate dynamic content based on title, brief, and industry context
                 prompt = f"""
@@ -536,8 +545,8 @@ Use provided tools.
                 
                 Task: {title}
                 Industry: {industry}
-                Topic: {meta['title']}
-                Tags: {meta['tags']}
+                Topic: {resource_meta['title']}
+                Tags: {resource_meta['tags']}
                 
                 Include code snippets (if technical), checklists, or step-by-step instructions.
                 Keep it under 200 words. Make it look like a real internal document.
@@ -550,16 +559,16 @@ Use provided tools.
                 content = clean_broken_links_sync(content)
                 
                 educational_resources.append({
-                    "title": meta["title"],
+                    "title": resource_meta["title"],
                     "description": f"AI-Generated Resource for {company}",
                     "content": content
                 })
-            except Exception as e:
+            except (ValueError, RuntimeError, ConnectionError) as e:
                 print(f"Error generating resource content: {e}")
                 # Fallback to static content
                 educational_resources.append({
-                    "title": meta["title"],
-                    "description": f"Internal Resource ({meta['id']})",
+                    "title": resource_meta["title"],
+                    "description": f"Internal Resource ({resource_meta['id']})",
                     "content": RESOURCE_CONTENT.get(meta["id"], "Content not available.")
                 })
     else:
@@ -593,9 +602,32 @@ Use provided tools.
             "has_ethical_trap": include_ethical_trap,
             "ethical_trap": ethical_trap
         },
-        "educational_resources": educational_resources
+        "educational_resources": educational_resources,
+        "video_brief": None # placeholder for now
     }
-    
+
+    # ---- VIDEO BRIEF (Emem) ----
+    if model and include_video_brief:
+        video_script = await emem.generate_video_brief_script(
+            title,
+            brief,
+            model
+        )
+
+        # Calculate duration based on script length (approx 150 words/minute)
+        word_count = len(video_script.split())
+        duration_seconds = max(30, int((word_count / 150) * 60))  # Min 30 seconds
+
+        task_dict["video_brief"] = {
+            "agent": "Emem",
+            "persona": "Sharp Nigerian Female Executive",
+            "accent": "en-NG",
+            "duration_seconds": duration_seconds,
+            "script": video_script,
+            "video_url": None,
+            "status": "simulated"
+        }
+
     return task_dict
 
 
@@ -670,10 +702,43 @@ def generate_ethical_trap(track: str) -> Dict[str, str]:
 
 # --- Test ---
 if __name__ == "__main__":
-    task = generate_task("Data Analytics", "intermediate", 1)
+    import asyncio
+    import os
+    from dotenv import load_dotenv
+    import google.generativeai as genai
+
+    # Load environment
+    load_dotenv()
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+    if not GEMINI_API_KEY:
+        print("GEMINI_API_KEY not found. Testing without video generation...")
+        model = None
+    else:
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        print("Model initialized successfully.")
+
+    # Test task generation
+    task = asyncio.run(generate_task("Data Analytics", "intermediate", 1, model=model, include_video_brief=True))
+
+    print(f"\n=== TASK DETAILS ===")
     print(f"Title: {task['title']}")
     print(f"Brief: {task['brief_content'][:200]}...")
     print(f"Deadline: {task['deadline']}")
     print(f"Deadline Display: {task['deadline_display']}")
     print(f"Constraints: {task['client_constraints']}")
-    print(f"Resources: {task['educational_resources']}")
+    print(f"Resources: {len(task['educational_resources'])} items")
+
+    if task.get('video_brief'):
+        print(f"\n=== VIDEO BRIEF ===")
+        vb = task['video_brief']
+        print(f"Agent: {vb['agent']}")
+        print(f"Persona: {vb['persona']}")
+        print(f"Accent: {vb['accent']}")
+        print(f"Duration: {vb['duration_seconds']} seconds")
+        print(f"Status: {vb['status']}")
+        print(f"Video URL: {vb['video_url']}")
+        print(f"Script ({len(vb['script'])} chars): {vb['script'][:200]}...")
+    else:
+        print("\nNo video brief generated.")

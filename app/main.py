@@ -285,6 +285,10 @@ def generate_tasks(req: TaskRequest):
     )
     return {"tasks": [task]}
 
+
+
+
+
 # ============ RESOURCE GENERATION ============
 
 # @app.post("/generate-resource", response_model=ResourceGenerationResponse)

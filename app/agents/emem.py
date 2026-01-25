@@ -170,5 +170,29 @@ This should feel like real workplace chaos — frustrating but professional.
     response = await model.generate_content_async(prompt)
     return response.text
 
+async def generate_video_brief_script(
+    task_title: str,
+    task_brief: str,
+    model
+) -> str:
+    prompt = f"""
+        You are Emem, a Nigerian project manager.
 
+        Write a short spoken-style briefing (max 120 words)
+        explaining this task to an intern.
 
+        TASK TITLE:
+        {task_title}
+
+        TASK BRIEF:
+        {task_brief}
+
+        Tone:
+        - Clear
+        - Direct
+        - Encouraging
+        - Sounds like a voice note or video explanation
+        """
+
+    response = await model.generate_content_async(prompt)
+    return response.text.strip()

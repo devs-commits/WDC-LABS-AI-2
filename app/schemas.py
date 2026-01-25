@@ -79,14 +79,30 @@ class TaskResource(BaseModel):
     content: Optional[str] = None  # Markdown content, generated lazily or upfront
 
 
+class VideoBrief(BaseModel):
+    agent: str
+    persona: str
+    accent: str
+    duration_seconds: int
+    script: str
+    video_url: Optional[str] = None
+    status: str
+
+
 class GeneratedTask(BaseModel):
     title: str
     brief_content: str
     difficulty: str
     client_constraints: Optional[str] = None
+    deadline: str
+    deadline_display: str
     attachments: Optional[List[str]] = []
     ai_persona_config: Optional[dict] = None
+    metadata: dict
     educational_resources: Optional[List[TaskResource]] = []
+    video_brief: Optional[VideoBrief] = None
+    has_ethical_trap: bool = False
+    ethical_trap: Optional[dict] = None
 
 
 class TaskGenerationResponse(BaseModel):

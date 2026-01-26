@@ -158,7 +158,7 @@ Create 2-week social media campaign for {company}'s new product launch.
     ],
     
     # CYBER-SECURITY
-    "cybersecurity": [
+    "cyber_security": [
         {
             "title_template": "Vulnerability Assessment: {company} Network",
             "brief_template": """
@@ -380,15 +380,15 @@ def select_task_resources(task_brief: str, track: str) -> list:
     resources += ARCHIVE_LIBRARY.get("general", [])[:1]
     
     return resources[:3]  # max 3 resources
-
 # --- Main task generation function ---
 async def generate_task(
+    # user_id: int,
+    user_name: str,
     track: str,
     difficulty: str = "intermediate",
     task_number: int = 1,
     user_city: str = None,
     include_ethical_trap: bool = None,
-    user_name: str = "Sorru",
     model = None,
     include_video_brief: bool = True
 ) -> Dict[str, Any]:
@@ -396,9 +396,10 @@ async def generate_task(
     Generate a unique, ungoogleable task based on track and difficulty.
     20-30% of tasks include ethical traps to test professional judgment.
     """
-
+    print("track was: ", track)
     # Normalize track name
     track_key = track.lower().replace(" ", "_")
+    track_key = track_key.lower().replace("-", "_")
     if track_key not in TASK_TEMPLATES:
         track_key = "data_analytics"
     

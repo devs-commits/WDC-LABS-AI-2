@@ -380,6 +380,9 @@ def select_task_resources(task_brief: str, track: str) -> list:
     resources += ARCHIVE_LIBRARY.get("general", [])[:1]
     
     return resources[:3]  # max 3 resources
+
+
+
 # --- Main task generation function ---
 async def generate_task(
     # user_id: int,
@@ -434,6 +437,7 @@ async def generate_task(
         "manual entry mistakes",
         "a timezone misconfiguration"
     ]
+
     
     # Format the template
     # CHECK FOR CURRICULUM OVERRIDE
@@ -521,7 +525,7 @@ Use provided tools.
     if include_ethical_trap:
         ethical_trap = generate_ethical_trap(track_key)
         brief += f"\n\n**⚠️ ETHICAL CONSIDERATION:**\n{ethical_trap['scenario']}\n"
-    
+
     # deadline - 1 day, excluding weekends
     deadline = now + timedelta(days=1)
     while deadline.weekday() >= 5:  # Skip Saturday (5) and Sunday (6)
@@ -631,6 +635,17 @@ Use provided tools.
 
     return task_dict
 
+    # Truncate task brief and/or resources if they exceed specified lengths
+
+    MAX_BRIEF_LENGTH = 200
+    MAX_RESOURCE_LENGTH = 300
+
+    if len(task_dict['brief_content']) > MAX_BRIEF_LENGTH:
+        task_dict['brief_content'] = task_dict['brief_content'][:MAX_BRIEF_LENGTH] + "..."
+
+    for res in task_dict.get('educational_resources', []):
+        if len(res['content']) > MAX_RESOURCE_LENGTH:
+            res['content'] = res['content'][:MAX_RESOURCE_LENGTH] + "..."
 
 # ============================================
 # ETHICAL TRAP GENERATION

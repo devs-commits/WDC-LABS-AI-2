@@ -8,8 +8,10 @@ import random
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
 from app.utils.deadline_formatter import format_deadline_display
+from app.search_engine import serper_search_links
 from app.utils.link_verifier import clean_broken_links_sync
 from .agents import emem
+
 
 # --- Industry contexts for task variation ---
 INDUSTRIES = [
@@ -197,7 +199,7 @@ Provide recommendations with priority rankings.
 # --- Resource Content Library ---
 RESOURCE_CONTENT = {
     "da_guide_01": """
-# Pandas Cheat Sheet for Data Cleaning
+# Use of Pandas for Data Cleaning
 
 ## 1. Handling Missing Data
 ```python
@@ -336,7 +338,7 @@ $$ ROAS = \\frac{\\text{Revenue from Ad}}{\\text{Cost of Ad}} $$
 }
 
 RESOURCE_METADATA = [
-    {"id": "da_guide_01", "title": "Pandas Cheat Sheet", "type": "code", "tags": ["csv", "data", "cleaning"], "track": "data_analytics"},
+    {"id": "da_guide_01", "title": "Pandas", "type": "code", "tags": ["csv", "data", "cleaning"], "track": "data_analytics"},
     {"id": "da_guide_02", "title": "ROAS Calculation Template", "type": "sheet", "tags": ["roas", "financial", "metrics"], "track": "data_analytics"},
     {"id": "dm_guide_01", "title": "SEO Basics PDF", "type": "pdf", "tags": ["seo", "audit", "website"], "track": "digital_marketing"},
     {"id": "dm_guide_02", "title": "Social Media Campaign Template", "type": "doc", "tags": ["campaign", "social", "calendar"], "track": "digital_marketing"},
@@ -388,6 +390,8 @@ async def generate_task(
     # user_id: int,
     user_name: str,
     track: str,
+    deadline_display: str,
+    experience_level: str = "",
     difficulty: str = "intermediate",
     task_number: int = 1,
     user_city: str = None,
@@ -444,12 +448,17 @@ async def generate_task(
     from app.curriculum import get_curriculum_step
     curriculum = get_curriculum_step(track_key, task_number)
 
+    print("\n\n\ncurriculum formed from track key and task number: ", track_key, task_number)
+    print("model was: ", model)
+    educational_resources = []
     if curriculum and model:
         # Generate fully dynamic task based on curriculum
         company = generate_company_name(industry)
         
         prompt = f"""
-        Generate a concise task brief for an intern named "{user_name}" at a {industry} company named {company}.
+        Generate a concise task brief for an intern named "{user_name}" at a {industry} company named {company}. This task should not 
+        require image or non-text media to be completed.
+        Under educational_resources below, provide a decent google search query I can use to find resources that would assist the user on the task 
         
         **Curriculum Logic:**
         - Task Number: {task_number}
@@ -465,14 +474,15 @@ async def generate_task(
         Create a realistic workplace scenario (Task Title and Brief).
         Address the intern directly by name ("Dear {user_name}").
         The intern should feel like they are solving a real problem for the business.
-        Include specific data points or file references (e.g., "attached sales_data.csv").
-        Keep the brief concise, under 150 words.
+        Include specific data points or file references(e.g. youtube videos, articles, websites).
+        Keep the brief concise, under 100 words.
         
         **Output Format (JSON):**
         {{
             "title": "Professional Task Title",
             "brief_template": "Concise brief...",
             "constraints": "Specific constraints..."
+            "educational_resources": "decent one sentence google search query"
         }}
         """
         
@@ -486,6 +496,7 @@ async def generate_task(
                 gen_data = json.loads(match.group())
                 title = gen_data.get("title")
                 brief = gen_data.get("brief_template")
+                educational_resources = gen_data.get("educational_resources")
                 template["constraints"] = gen_data.get("constraints") # Override constrains
             else:
                 raise ValueError("Failed to parse AI curriculum task")
@@ -508,6 +519,7 @@ Use provided tools.
             template["constraints"] = "Standard professional constraints apply."
 
     else:
+        print("\n\n\n no curriculum or model, falling back...\n\n\n")
         # STANDARD TEMPLATE LOGIC
         title = template["title_template"].format(company=company, industry=industry, city=city)
         brief = template["brief_template"].format(
@@ -537,9 +549,7 @@ Use provided tools.
     # --- Resource selection ---
     # Pick relevant metadata first
     resource_metadata = select_task_resources(brief, track_key)
-    
-    educational_resources = []
-    
+        
     # If model is available, use AI to generate the content dynamically
     if model:
         for resource_meta in resource_metadata:
@@ -562,20 +572,8 @@ Use provided tools.
                 
                 # Clean any broken links from the generated content
                 content = clean_broken_links_sync(content)
-                
-                educational_resources.append({
-                    "title": resource_meta["title"],
-                    "description": f"AI-Generated Resource for {company}",
-                    "content": content
-                })
             except (ValueError, RuntimeError, ConnectionError) as e:
                 print(f"Error generating resource content: {e}")
-                # Fallback to static content
-                educational_resources.append({
-                    "title": resource_meta["title"],
-                    "description": f"Internal Resource ({resource_meta['id']})",
-                    "content": RESOURCE_CONTENT.get(meta["id"], "Content not available.")
-                })
     else:
         # Fallback if no model provided
         educational_resources = [
@@ -590,15 +588,14 @@ Use provided tools.
         "difficulty": difficulty,
         "client_constraints": template.get("constraints"),
         "deadline": deadline.isoformat(),
-        "deadline_display": deadline_display,
+        "experience_level": experience_level,
         "attachments": [],
         "ai_persona_config": {
             "role": "Supervisor",
             "tone": "professional",
             "expertise": track,
             "instruction": "Review submission thoroughly",
-            "duration": f"{duration_days} day"
-        },
+            "deadline_display": deadline_display        },
         "metadata": {
             "company": company,
             "industry": industry,
@@ -607,7 +604,7 @@ Use provided tools.
             "has_ethical_trap": include_ethical_trap,
             "ethical_trap": ethical_trap
         },
-        "educational_resources": educational_resources,
+        "educational_resources": serper_search_links(educational_resources, num_results=3),
         "video_brief": None # placeholder for now
     }
 
@@ -632,20 +629,12 @@ Use provided tools.
             "video_url": None,
             "status": "simulated"
         }
+    # Truncate task brief and/or resources if they exceed specified lengths
+    # max_brief_length = 200
+    # max_resource_length = 300
 
     return task_dict
 
-    # Truncate task brief and/or resources if they exceed specified lengths
-
-    MAX_BRIEF_LENGTH = 200
-    MAX_RESOURCE_LENGTH = 300
-
-    if len(task_dict['brief_content']) > MAX_BRIEF_LENGTH:
-        task_dict['brief_content'] = task_dict['brief_content'][:MAX_BRIEF_LENGTH] + "..."
-
-    for res in task_dict.get('educational_resources', []):
-        if len(res['content']) > MAX_RESOURCE_LENGTH:
-            res['content'] = res['content'][:MAX_RESOURCE_LENGTH] + "..."
 
 # ============================================
 # ETHICAL TRAP GENERATION
@@ -717,6 +706,8 @@ def generate_ethical_trap(track: str) -> Dict[str, str]:
     return random.choice(available_traps)
 
 # --- Test ---
+
+"""
 if __name__ == "__main__":
     import asyncio
     import os
@@ -758,3 +749,4 @@ if __name__ == "__main__":
         print(f"Script ({len(vb['script'])} chars): {vb['script'][:200]}...")
     else:
         print("\nNo video brief generated.")
+"""

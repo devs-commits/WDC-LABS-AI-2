@@ -270,7 +270,9 @@ class TaskRequest(BaseModel):
     user_id: str
     user_name: str
     track: str
+    difficulty: str
     experience_level: str
+    deadline_display: str
     task_number: int
     user_city: Optional[str] = None
     include_ethical_trap: bool
@@ -279,12 +281,12 @@ class TaskRequest(BaseModel):
 
 @app.post("/generate-tasks")
 async def generate_tasks(req: TaskRequest):
-    print("request body: ", req)
-
     task = await generate_task(
         # user_id=req.user_id,
         track=req.track,
         difficulty=req.experience_level.lower(),
+        deadline_display=req.deadline_display,
+        experience_level=req.experience_level,
         task_number=req.task_number,
         user_city=req.user_city,
         user_name=req.user_name,

@@ -96,6 +96,7 @@ class GeneratedTask(BaseModel):
     client_constraints: Optional[str] = None
     deadline: str
     deadline_display: str
+    experience_level: str
     attachments: Optional[List[str]] = []
     ai_persona_config: Optional[dict] = None
     metadata: dict

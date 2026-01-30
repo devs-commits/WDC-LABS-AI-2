@@ -397,7 +397,7 @@ async def generate_task(
     user_city: str = None,
     include_ethical_trap: bool = None,
     model = None,
-    include_video_brief: bool = True
+    include_video_brief: bool = True,
 ) -> Dict[str, Any]:
     """
     Generate a unique, ungoogleable task based on track and difficulty.
@@ -451,13 +451,18 @@ async def generate_task(
     print("\n\n\ncurriculum formed from track key and task number: ", track_key, task_number)
     print("model was: ", model)
     educational_resources = []
+    # attachments = []
     if curriculum and model:
         # Generate fully dynamic task based on curriculum
         company = generate_company_name(industry)
         
         prompt = f"""
-        Generate a concise task brief for an intern named "{user_name}" at a {industry} company named {company}. This task should not 
-        require image or non-text media to be completed.
+        Generate a task brief for an intern named "{user_name}" at a {industry} company named {company}, that will not require external file reference for the particular task
+
+        For the task brief, include:
+        - A professional tone
+        - Clear objectives and deliverables
+
         Under educational_resources below, provide a decent google search query I can use to find resources that would assist the user on the task 
         
         **Curriculum Logic:**
@@ -473,10 +478,25 @@ async def generate_task(
         **Instructions:**
         Create a realistic workplace scenario (Task Title and Brief).
         Address the intern directly by name ("Dear {user_name}").
-        The intern should feel like they are solving a real problem for the business.
+        The intern should feel like they are solving a real problem for the business because they are.
         Include specific data points or file references(e.g. youtube videos, articles, websites).
-        Keep the brief concise, under 100 words.
-        
+        Keep the brief concise, under 250 words.
+
+        **Track Details**
+        DATA ANALYTICS:
+        - Task should reference only datasets that are readily available on the internet, else, should require no dataset or external file
+
+        DIGITAL MARKETING:
+        - Create marketing campaign briefs and strategies
+        - Include documents like campaign plans, social media content, or analytics reports
+        - Generate realistic marketing data and metrics
+
+        CYBERSECURITY:
+        - Focus ONLY on theoretical scenarios, policy creation, or security assessments
+        - NEVER create real vulnerabilities, exploits, or harmful content
+        - Include security policies, audit reports, or threat modeling documents
+        - Emphasize ethical considerations and compliance
+                
         **Output Format (JSON):**
         {{
             "title": "Professional Task Title",
@@ -497,6 +517,7 @@ async def generate_task(
                 title = gen_data.get("title")
                 brief = gen_data.get("brief_template")
                 educational_resources = gen_data.get("educational_resources")
+                # attachments = gen_data.get("attachments")
                 template["constraints"] = gen_data.get("constraints") # Override constrains
             else:
                 raise ValueError("Failed to parse AI curriculum task")
@@ -542,12 +563,13 @@ Use provided tools.
     deadline = now + timedelta(days=1)
     while deadline.weekday() >= 5:  # Skip Saturday (5) and Sunday (6)
         deadline += timedelta(days=1)
-    duration_days = (deadline - now).days
+    # duration_days = (deadline - now).days
     deadline_display = format_deadline_display(deadline.isoformat())
 
 
     # --- Resource selection ---
     # Pick relevant metadata first
+    # print("\n\n\n task brief", brief)
     resource_metadata = select_task_resources(brief, track_key)
         
     # If model is available, use AI to generate the content dynamically
@@ -589,7 +611,7 @@ Use provided tools.
         "client_constraints": template.get("constraints"),
         "deadline": deadline.isoformat(),
         "experience_level": experience_level,
-        "attachments": [],
+        # "attachments": attachments,
         "ai_persona_config": {
             "role": "Supervisor",
             "tone": "professional",
@@ -704,49 +726,3 @@ def generate_ethical_trap(track: str) -> Dict[str, str]:
     available_traps = ethical_traps_by_track.get(track_key, ethical_traps_by_track["data_analytics"])
     
     return random.choice(available_traps)
-
-# --- Test ---
-
-"""
-if __name__ == "__main__":
-    import asyncio
-    import os
-    from dotenv import load_dotenv
-    import google.generativeai as genai
-
-    # Load environment
-    load_dotenv()
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-    if not GEMINI_API_KEY:
-        print("GEMINI_API_KEY not found. Testing without video generation...")
-        model = None
-    else:
-        genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        print("Model initialized successfully.")
-
-    # Test task generation
-    task = asyncio.run(generate_task("Data Analytics", "intermediate", 1, model=model, include_video_brief=True))
-
-    print(f"\n=== TASK DETAILS ===")
-    print(f"Title: {task['title']}")
-    print(f"Brief: {task['brief_content'][:200]}...")
-    print(f"Deadline: {task['deadline']}")
-    print(f"Deadline Display: {task['deadline_display']}")
-    print(f"Constraints: {task['client_constraints']}")
-    print(f"Resources: {len(task['educational_resources'])} items")
-
-    if task.get('video_brief'):
-        print(f"\n=== VIDEO BRIEF ===")
-        vb = task['video_brief']
-        print(f"Agent: {vb['agent']}")
-        print(f"Persona: {vb['persona']}")
-        print(f"Accent: {vb['accent']}")
-        print(f"Duration: {vb['duration_seconds']} seconds")
-        print(f"Status: {vb['status']}")
-        print(f"Video URL: {vb['video_url']}")
-        print(f"Script ({len(vb['script'])} chars): {vb['script'][:200]}...")
-    else:
-        print("\nNo video brief generated.")
-"""

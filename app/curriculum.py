@@ -168,7 +168,7 @@ CURRICULUM = {
     # ================================
     # 3C. Cybersecurity Matrix
     # ================================
-    "cybersecurity": {
+    "cyber_security": {
         1: {
             "topic": "Linux Basics",
             "objective": "Server down. SSH in. Navigate via CLI only. No GUI.",
@@ -249,4 +249,6 @@ def get_curriculum_step(track: str, task_number: int):
     """Retrieve the specific curriculum step for a given track and task number."""
     track_key = track.lower().replace(" ", "_")
     track_curriculum = CURRICULUM.get(track_key, {})
+
+    print("found in track curriculum: -->", track_curriculum.get(task_number))
     return track_curriculum.get(task_number)

@@ -157,7 +157,8 @@ async def conduct_mock_interview(
     interview_type: str,
     question_number: int,
     previous_answer: Optional[str],
-    model: genai.GenerativeModel
+    model: genai.GenerativeModel,
+    interview_subtype: Optional[str] = None
 ) -> dict:
     """
     Conduct a realistic mock interview.
@@ -210,6 +211,7 @@ Be honest. No encouragement fluff.
 {interviewer_rules}
 
 Interview Type: {interview_type}
+Focus Area: {interview_subtype or "General"}
 Question Number: {question_number} of {TOTAL_QUESTIONS}
 
 Previous Answer:
@@ -217,14 +219,44 @@ Previous Answer:
 {previous_answer or "N/A"}
 \"\"\"
 
-Ask the next interview question.
-If the previous answer was vague, ask a follow-up instead.
+1. Evaluate the previous answer (if any). Be brief (1 sentence).
+2. Ask the next interview question.
+3. Provide a helpful confusing tip for THIS question (e.g. "Focus on X").
+
+Respond with JSON:
+{{
+    "evaluation": "Evaluation of previous answer...",
+    "question": "The actual question...",
+    "tip": "Helpful tip..."
+}}
 """
 
     response = await model.generate_content_async(interview_prompt)
-
-    return {
-        "stage": "question",
-        "question_number": question_number,
-        "content": response.text
-    }
+    
+    try:
+        text = response.text.strip()
+        if text.startswith("```json"):
+            text = text[7:]
+        if text.startswith("```"):
+            text = text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+        
+        data = json.loads(text.strip())
+        
+        return {
+            "stage": "question",
+            "question_number": question_number,
+            "content": data.get("question", ""),
+            "tip": data.get("tip", ""),
+            "evaluation": data.get("evaluation", "")
+        }
+    except json.JSONDecodeError:
+        # Fallback
+        return {
+            "stage": "question",
+            "question_number": question_number,
+            "content": response.text,
+            "tip": "Be yourself and answer honestly.",
+            "evaluation": None
+        }

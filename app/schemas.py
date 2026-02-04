@@ -144,6 +144,23 @@ class PortfolioBulletResponse(BaseModel):
     bullet_point: str
 
 
+# Mock Interview
+class MockInterviewRequest(BaseModel):
+    interview_type: Literal["behavioral", "technical", "situational"]
+    interview_subtype: Optional[str] = None # e.g. "conflict", "leadership"
+    question_number: int
+    previous_answer: Optional[str] = None
+
+
+class MockInterviewResponse(BaseModel):
+    stage: Literal["question", "feedback"]
+    question_number: Optional[int] = None
+    content: str
+    question: Optional[str] = None
+    tip: Optional[str] = None
+    evaluation: Optional[str] = None
+
+
 # Onboarding Team Introduction
 class OnboardingIntroRequest(BaseModel):
     user_id: str

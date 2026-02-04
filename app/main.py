@@ -28,7 +28,8 @@ from app.schemas import (
     PortfolioBulletRequest, PortfolioBulletResponse,
     OnboardingIntroRequest, OnboardingIntroResponse,
     OnboardingIntroMessage, AgentName,
-    ResourceGenerationRequest, ResourceGenerationResponse
+    ResourceGenerationRequest, ResourceGenerationResponse,
+    MockInterviewRequest, MockInterviewResponse
 )
 from app.task_templates import generate_task
 from app.utils.file_extractor import extract_text_from_file
@@ -157,6 +158,33 @@ async def translate_to_cv(request: PortfolioBulletRequest):
         return PortfolioBulletResponse(
             skill_tag=result.get("skill_tag"),
             bullet_point=result.get("bullet_point")
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+# ============ MOCK INTERVIEW ============
+
+@app.post("/mock-interview", response_model=MockInterviewResponse)
+async def mock_interview(request: MockInterviewRequest):
+    try:
+        from .agents import kemi
+        result = await kemi.conduct_mock_interview(
+            interview_type=request.interview_type,
+            question_number=request.question_number,
+            previous_answer=request.previous_answer,
+            model=model,
+            interview_subtype=request.interview_subtype
+        )
+        
+        return MockInterviewResponse(
+            stage=result.get("stage"),
+            question_number=result.get("question_number"),
+            content=result.get("content"),
+            question=result.get("content"), # Map content to question for frontend
+            tip=result.get("tip"),
+            evaluation=result.get("evaluation")
         )
     except HTTPException:
         raise

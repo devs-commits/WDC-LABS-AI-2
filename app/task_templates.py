@@ -462,6 +462,7 @@ async def generate_task(
         For the task brief, include:
         - A professional tone
         - Clear objectives and deliverables
+        - Submission instructions (always submitting to Emem and Sola)
 
         Under educational_resources below, provide a decent google search query I can use to find resources that would assist the user on the task 
         
@@ -485,18 +486,43 @@ async def generate_task(
         **Track Details**
         DATA ANALYTICS:
         - Task should reference only datasets that are readily available on the internet, else, should require no dataset or external file
+        - No references to 'attached files', 'above logs', or 'the system' that are not explicitly included in your response.
 
         DIGITAL MARKETING:
         - Create marketing campaign briefs and strategies
         - Include documents like campaign plans, social media content, or analytics reports
         - Generate realistic marketing data and metrics
+        - No references to 'attached files', 'above logs', or 'the system' that are not explicitly included in your response.
 
         CYBERSECURITY:
-        - Focus ONLY on theoretical scenarios, policy creation, or security assessments
-        - NEVER create real vulnerabilities, exploits, or harmful content
-        - Include security policies, audit reports, or threat modeling documents
-        - Emphasize ethical considerations and compliance
-                
+        **Cybersecurity Task TYPES - Choose ONLY one of these formats:**
+        1. **Policy Drafting**: "Write a 150-word [Policy Area] policy for [infosec concept], covering [specific requirement]."
+        2. **Threat Modeling Workshop**: "Analyze the architecture below for [attack vector]. Identify 2 risks and mitigation steps."
+        3. **Security Audit Simulation**: "Review this simulated finding from a Nessus scan (below) and write a one-paragraph..."
+        4. **Incident Response Exercise**: "Read this summary of a security incident. Outline the first 4 steps your team should take."
+        5. **Compliance Mapping**: "Answer 3 questions about how this process aligns with ISO 27001 control A.x.x."
+        6. **Comparative Analysis**: "Compare these two simulated firewall rule sets. Which is less vulnerable to IP spoofing?"
+        7. **Documentation**: "Write an employee guideline for detecting [type of phishing email] based on 3 indicators."
+
+        **NEVER:** Binaries, packet captures, real IPs, encryption keys, live exploits, or off-the-shelf tool misuse (e.g., 'use Metasploit' without a lab).
+        **SOP (Standard Operating Procedures) for High-Risk Topics:**
+        If curriculum['topic'] is ANY of: ['Backend Systems', 'Server Management', 'Network Admin', 'Linux CLI', 'Cloud Admin']:
+        - ❌ NEVER GENERATE 'live' commands (no SSH, docker, kubectl, vmrun, etc.)
+        - ✅ ONLY USE **simulated data analysis** tasks
+        - ✅ Example: "Analyze this simulated df output" (see block below)
+        - ✅ Example: "Review this sysadmin script for errors" (provide code)
+        - ✅ Example: "Write documentation for this *descriptive* server config"
+
+        **Content Generation Rules:**
+        - If the task needs DATA: Include the full dataset directly in the brief (numbers, sample text, log snippets) as a code block OR use only datasets known to be on Kaggle/public Gdrive (e.g., 'Twitter sentiment dataset', 'Google Analytics sample data', 'NASA weather data').
+        - If the task needs LOGS: Generate a small, self-contained log sample (10-30 lines) right in the brief (with a note: "Simulated Log Sample Below").
+        - If the task needs POLICIES/REPORTS: Generate the base template in full, with placeholders marked clearly (e.g., [COMPANY] input field for firewall rules).
+        - If the task needs CODE SNIPPETS: Provide the code directly in a markdown code block, never reference 'the above code'.
+        - ALWAYS prefer tasks that require the intern to **create**, **analyze**, **research**, or **write** over tasks that require **debugging**, **exploiting**, or **forensics** of unseen systems.
+
+
+        **AI Validator:** Before generating, ask yourself: 'If the intern followed these instructions literally, could they complete the task WITHOUT any file I didn't generate, tool I didn't name, or system I didn't describe?'
+
         **Output Format (JSON):**
         {{
             "title": "Professional Task Title",

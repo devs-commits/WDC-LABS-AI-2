@@ -8,11 +8,12 @@ load_dotenv()
 
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 
-def serper_search_links(query: str, num_results: int = 5) -> Optional[str]:
+def serper_search_links(query: str, num_results: int = 5) -> List[Dict[str, Any]]:
     """
-    Perform a Serper.dev search and return comma-separated URLs from organic results
-    and People Also Ask.
+    Perform a Serper.dev search and return structured search results
+    including title, url, and snippet.
     """
+
     url = "https://google.serper.dev/search"
     headers = {
         "X-API-KEY": SERPER_API_KEY,
@@ -26,28 +27,24 @@ def serper_search_links(query: str, num_results: int = 5) -> Optional[str]:
         data = response.json()
     except requests.RequestException as e:
         print(f"Error during Serper search request: {e}")
-        return ""
+        return []
 
-    links = []
+    results = []
 
-    # Organic search results
     for item in data.get("organic", []):
         link = item.get("link")
+        title = item.get("title")
+        snippet = item.get("snippet")
+
         if link:
-            links.append(link)
+            results.append({
+                "type": "link",
+                "title": title,
+                "url": link,
+                "description": snippet
+            })
 
-        # Also include sitelinks if they exist
-        for sitelink in item.get("sitelinks", []):
-            sl = sitelink.get("link")
-            if sl:
-                links.append(sl)
+        if len(results) >= num_results:
+            break
 
-    # People Also Ask
-    for item in data.get("peopleAlsoAsk", []):
-        link = item.get("link")
-        if link:
-            links.append(link)
-
-    # Deduplicate and limit number of results
-    unique_links = list(dict.fromkeys(links))  # preserves order
-    return ", ".join(unique_links[:num_results])
+    return results[:num_results]

@@ -12,7 +12,9 @@ def get_system_prompt() -> str:
     with open(PROMPT_PATH, "r", encoding="utf-8") as f:
         return f.read()
 
-def respond(message: str, context: dict | None = None):
+from typing import Optional
+
+def respond(message: str, context: Optional[dict] = None):
     return "Tolu response placeholder"
 
 

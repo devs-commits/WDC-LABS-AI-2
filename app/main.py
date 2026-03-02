@@ -1,7 +1,23 @@
+print("🚀 RUNNING THIS MAIN FILE:", __file__)
+
+from dotenv import load_dotenv
+import os
+
+from dotenv import load_dotenv
+from pathlib import Path
+import os
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+env_path = BASE_DIR / ".env.production"
+
+load_dotenv(dotenv_path=env_path)
+
+print("Loaded GEMINI:", os.getenv("GEMINI_API_KEY"))
 """
 WDC Labs AI Backend
 FastAPI application for the immersive virtual office AI system.
 """
+
 
 import os
 import io
@@ -294,38 +310,36 @@ async def review_submission(request: SubmissionReviewRequest):
 
 # ============ TASK GENERATION ============
 
+from pydantic import BaseModel
+from typing import Optional
+
 class TaskRequest(BaseModel):
-    user_id: str
     user_name: str
     track: str
-    difficulty: str
-    experience_level: str
     deadline_display: str
-    task_number: int
+    experience_level: Optional[str] = ""
+    difficulty: Optional[str] = "intermediate"
+    task_number: Optional[int] = 1
     user_city: Optional[str] = None
-    include_ethical_trap: bool
-    model: str
-    include_video_brief: bool
+    include_ethical_trap: Optional[bool] = False
+    include_video_brief: Optional[bool] = True
 
 @app.post("/generate-tasks")
 async def generate_tasks(req: TaskRequest):
     task = await generate_task(
-        # user_id=req.user_id,
+        user_name=req.user_name,
         track=req.track,
-        difficulty=req.experience_level.lower(),
         deadline_display=req.deadline_display,
         experience_level=req.experience_level,
+        difficulty=req.difficulty,
         task_number=req.task_number,
         user_city=req.user_city,
-        user_name=req.user_name,
-        model=model, # Pass the AI model for content generation
         include_ethical_trap=req.include_ethical_trap,
+        model=model,
         include_video_brief=req.include_video_brief
     )
+
     return {"tasks": [task]}
-
-
-
 
 
 # ============ RESOURCE GENERATION ============

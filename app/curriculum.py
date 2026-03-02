@@ -8,6 +8,10 @@ WDC Labs Curriculum Definitions.
 Maps specific task numbers in a track to learning objectives and topics.
 """
 
+FRAMEWORK_DEFINITIONS = {
+    "3i_principles": "Initiate, Iterate, Integrate"
+}
+
 CURRICULUM = {
     # ================================
     # 3A. Digital Marketing Matrix

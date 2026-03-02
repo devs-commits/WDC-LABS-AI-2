@@ -13,7 +13,9 @@ def get_system_prompt() -> str:
         return f.read()
 
 
-def respond(message: str, context: dict | None = None) -> str:
+from typing import Optional
+
+def respond(message: str, context: Optional[dict] = None) -> str:
     """Simple response placeholder for Kemi."""
     return "Kemi response placeholder"
 

@@ -5,13 +5,17 @@ Includes ethical training scenarios and compliance checks.
 """
 
 import random
+import re
+import json
+import requests
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
-from app.utils.deadline_formatter import format_deadline_display
-from app.search_engine import serper_search_links
-from app.utils.link_verifier import clean_broken_links_sync
-from .agents import emem
 
+# Internal app imports
+from app.utils.deadline_formatter import format_deadline_display
+from app.utils.link_verifier import clean_broken_links_sync
+from app.curriculum import get_curriculum_step
+from .agents import emem
 
 # --- Industry contexts for task variation ---
 INDUSTRIES = [
@@ -49,11 +53,8 @@ def inject_data_anomalies(data: List[Dict], anomaly_count: int = 3) -> tuple:
     Returns (corrupted_data, anomaly_descriptions)
     """
     anomaly_types = [
-        "currency_conversion_error",
-        "duplicate_row",
-        "null_value",
-        "date_format_error",
-        "decimal_shift"
+        "currency_conversion_error", "duplicate_row", 
+        "null_value", "date_format_error", "decimal_shift"
     ]
     
     anomalies = []
@@ -92,302 +93,52 @@ def inject_data_anomalies(data: List[Dict], anomaly_count: int = 3) -> tuple:
 
 # --- Task templates by track ---
 TASK_TEMPLATES = {
-    # DATA ANALYTICS
     "data_analytics": [
         {
             "title_template": "Data Cleansing: {company} Sales Data",
-            "brief_template": """
-Clean {company}'s {month} {year} sales data CSV. {anomaly_count} anomalies caused by {error_cause}. Find them, fix data, calculate real ROAS.
-
-**Tasks:**
-- Identify anomalies
-- Document issues  
-- Calculate corrected ROAS
-- 3-sentence summary
-""",
+            "brief_template": """Clean {company}'s {month} {year} sales data CSV. {anomaly_count} anomalies caused by {error_cause}. Find them, fix data, calculate real ROAS.\n\n**Tasks:**\n- Identify anomalies\n- Document issues\n- Calculate corrected ROAS\n- 3-sentence summary""",
             "constraints": "Must use Python. No external libraries except pandas and numpy.",
             "difficulty_levels": ["beginner", "intermediate", "advanced"]
         },
         {
             "title_template": "{company} Customer Segmentation Analysis",
-            "brief_template": """
-Analyze {company}'s customer dataset. Create segments based on purchase frequency, average order value, time since last purchase.
-
-**Deliverables:**
-1. 3+ customer segments
-2. Segment characteristics  
-3. 1 marketing recommendation per segment
-""",
+            "brief_template": """Analyze {company}'s customer dataset. Create segments based on purchase frequency, average order value, time since last purchase.\n\n**Deliverables:**\n1. 3+ customer segments\n2. Segment characteristics\n3. 1 marketing recommendation per segment""",
             "constraints": "Analysis must be reproducible. Document your methodology.",
             "difficulty_levels": ["intermediate", "advanced"]
         }
     ],
-    
-    # DIGITAL MARKETING
     "digital_marketing": [
         {
             "title_template": "SEO Audit: {company} Website",
-            "brief_template": """
-Audit {company}'s website SEO. Client in {industry}, targeting {city} market.
-
-**Scope:**
-1. 5+ technical SEO issues
-2. On-page optimization opportunities
-3. Content gap analysis
-4. 3 competitor keywords
-
-**Note:** Website has intentional errors. Find them.
-""",
+            "brief_template": """Audit {company}'s website SEO. Client in {industry}, targeting {city} market.\n\n**Scope:**\n1. 5+ technical SEO issues\n2. On-page optimization opportunities\n3. Content gap analysis\n4. 3 competitor keywords""",
             "constraints": "Use only free tools. Screaming Frog free version is acceptable.",
             "difficulty_levels": ["beginner", "intermediate"]
         },
         {
             "title_template": "Social Media Campaign: {company} Product Launch",
-            "brief_template": """
-Create 2-week social media campaign for {company}'s new product launch.
-
-**Requirements:**
-- Content calendar with post ideas
-- Platform strategies (Instagram, Twitter, LinkedIn)
-- Hashtag strategy
-- KPIs to track success
-
-**Budget:** ₦50,000 total.
-""",
+            "brief_template": """Create 2-week social media campaign for {company}'s new product launch.\n\n**Requirements:**\n- Content calendar with post ideas\n- Platform strategies (Instagram, Twitter, LinkedIn)\n- Hashtag strategy\n- KPIs to track success\n\n**Budget:** ₦50,000 total.""",
             "constraints": "All content must be culturally appropriate for Nigerian audience.",
             "difficulty_levels": ["intermediate", "advanced"]
         }
     ],
-    
-    # CYBER-SECURITY
     "cyber_security": [
         {
             "title_template": "Vulnerability Assessment: {company} Network",
-            "brief_template": """
-Assess {company}'s network security. Review network diagram and configs.
-
-**Identify:**
-1. 3+ vulnerabilities
-2. Risk level (High/Medium/Low)
-3. Remediation steps
-4. Quick wins vs. long-term fixes
-
-**Note:** Configs have common misconfigurations. Document them.
-""",
+            "brief_template": """Assess {company}'s network security. Review network diagram and configs.\n\n**Identify:**\n1. 3+ vulnerabilities\n2. Risk level (High/Medium/Low)\n3. Remediation steps\n4. Quick wins vs. long-term fixes""",
             "constraints": "Do not attempt active scanning. This is a passive assessment only.",
             "difficulty_levels": ["beginner", "intermediate", "advanced"]
         },
         {
             "title_template": "Security Policy Review: {company}",
-            "brief_template": """
-Review {company}'s new security policy for gaps.
-
-**Focus Areas:**
-1. Password policy adequacy
-2. Incident response procedures
-3. Data classification gaps
-4. Access control weaknesses
-
-Provide recommendations with priority rankings.
-""",
+            "brief_template": """Review {company}'s new security policy for gaps.\n\n**Focus Areas:**\n1. Password policy adequacy\n2. Incident response procedures\n3. Data classification gaps\n4. Access control weaknesses""",
             "constraints": "Recommendations must be practical for a small business (under 50 employees).",
             "difficulty_levels": ["intermediate", "advanced"]
         }
     ]
 }
 
-# --- Resource Content Library ---
-RESOURCE_CONTENT = {
-    "da_guide_01": """
-# Use of Pandas for Data Cleaning
-
-## 1. Handling Missing Data
-```python
-# Check for null values
-df.isnull().sum()
-
-# Drop rows with nulls
-df.dropna()
-
-# Fill nulls with mean/median
-df['column'].fillna(df['column'].mean(), inplace=True)
-```
-
-## 2. Removing Duplicates
-```python
-# Check duplicates
-df.duplicated().sum()
-
-# Drop duplicates
-df.drop_duplicates(inplace=True)
-```
-
-## 3. Data Type Conversion
-```python
-# Convert to datetime
-df['date'] = pd.to_datetime(df['date'])
-
-# Convert to numeric
-df['sales'] = pd.to_numeric(df['sales'], errors='coerce')
-```
-""",
-    "da_guide_02": """
-# ROAS Calculation Template
-
-**Formula:**
-$$ ROAS = \\frac{\\text{Revenue from Ad}}{\\text{Cost of Ad}} $$
-
-## Steps to Calculate
-1. **Clean Revenue Data**: Ensure currency symbols are removed and values are numeric.
-2. **Clean Cost Data**: Handle any missing or zero cost entries (avoid division by zero).
-3. **Calculate per Campaign**:
-   ```python
-   df['ROAS'] = df['revenue'] / df['cost']
-   ```
-4. **Benchmark**:
-   - ROAS < 4: Poor
-   - ROAS > 4: Good
-   - ROAS > 8: Excellent
-""",
-    "dm_guide_01": """
-# SEO Basics: Technical Audit Checklist
-
-## 1. Crawlability
-- [ ] Check robots.txt (is it blocking important pages?)
-- [ ] Verify XML Sitemap existence
-- [ ] Check for 404 errors (Broken links)
-
-## 2. On-Page Elements
-- [ ] Title Tags: Are they unique and under 60 chars?
-- [ ] Meta Descriptions: Do they exist and encourage clicks?
-- [ ] H1 Tags: One per page, containing primary keyword.
-
-## 3. Performance
-- [ ] Page Load Speed (< 3s is ideal)
-- [ ] Mobile Responsiveness check
-- [ ] Image Optimization (Alt tags + sizing)
-""",
-    "dm_guide_02": """
-# Social Media Campaign Template
-
-## Campaign Overview
-- **Goal**: [Brand Awareness / Conversion / Engagement]
-- **Target Audience**: [Demographics / Interests]
-- **Duration**: [Start Date] - [End Date]
-
-## Platform Strategy
-### Instagram (Visuals)
-- Feed Posts: 3x per week (High quality product shots)
-- Stories: Daily (Behind the scenes, Polls)
-- Reels: 2x per week (Trends, Educational)
-
-### LinkedIn (Professional)
-- Thought Leadership: 1x per week
-- Company Updates: 1x per week
-
-## KPI Tracking
-| Metric | Goal |
-|--------|------|
-| Impressions | 10,000 |
-| Clicks | 500 |
-| Engagement Rate | 3.5% |
-""",
-    "cyber_guide_01": """
-# Vulnerability Assessment Checklist
-
-## Network Security
-1. **Firewall Configuration**: Are default ports closed?
-2. **Access Control**: Is Least Privilege enforced?
-3. **Wi-Fi**: Is WPA3 encryption enabled?
-
-## System Hardening
-1. **Patch Management**: Are all systems updated?
-2. **Default Accounts**: Have default passwords been changed?
-3. **Services**: Are unnecessary services disabled?
-
-## Monitoring
-1. Is logging enabled?
-2. Are alerts configured for suspicious activity?
-""",
-    "cyber_guide_02": """
-# Security Policy Template Structure
-
-1. **Purpose**: Why does this policy exist?
-2. **Scope**: Who and what does it apply to?
-3. **Policy Statement**: The core rules.
-   - *Password Requirements*: (Length, complexity, rotation)
-   - *Access Control*: (RBAC, MFA)
-   - *Data Handling*: (Classification, encryption)
-4. **Enforcement**: Penalties for non-compliance.
-5. **Review Cycle**: How often is this updated?
-""",
-    "general_01": """
-# Reference Hint Document
-
-## How to Approach This Task
-1. **Read the Brief Carefully**: Identify the key deliverables.
-2. **Check Constraints**: Are there format or tool restrictions?
-3. **Plan Your Steps**: Break the problem down.
-4. **Validate**: Double-check your work against the requirements.
-
-## Troubleshooting
-- **Missing Data?** Document it as a finding.
-- **Ambiguous Instructions?** Make a reasonable assumption and state it clearly.
-- **Stuck?** Check the specific guides for your track.
-"""
-}
-
-RESOURCE_METADATA = [
-    {"id": "da_guide_01", "title": "Pandas", "type": "code", "tags": ["csv", "data", "cleaning"], "track": "data_analytics"},
-    {"id": "da_guide_02", "title": "ROAS Calculation Template", "type": "sheet", "tags": ["roas", "financial", "metrics"], "track": "data_analytics"},
-    {"id": "dm_guide_01", "title": "SEO Basics PDF", "type": "pdf", "tags": ["seo", "audit", "website"], "track": "digital_marketing"},
-    {"id": "dm_guide_02", "title": "Social Media Campaign Template", "type": "doc", "tags": ["campaign", "social", "calendar"], "track": "digital_marketing"},
-    {"id": "cyber_guide_01", "title": "Vulnerability Checklist", "type": "sheet", "tags": ["vulnerability", "network", "assessment"], "track": "cybersecurity"},
-    {"id": "cyber_guide_02", "title": "Security Policy Template", "type": "doc", "tags": ["policy", "review", "access"], "track": "cybersecurity"},
-    {"id": "general_01", "title": "General Task Workflow", "type": "doc", "tags": [], "track": "general"}
-]
-
-# Build the Archive Library map for easy lookup
-ARCHIVE_LIBRARY = {
-    "data_analytics": [],
-    "digital_marketing": [],
-    "cybersecurity": [],
-    "general": []
-}
-
-for meta in RESOURCE_METADATA:
-    # Add content relative to ID
-    item = {
-        "id": meta["id"],
-        "title": meta["title"],
-        "tags": meta["tags"],
-        "content": RESOURCE_CONTENT.get(meta["id"], "Content not found.")
-    }
-    
-    if meta["track"] in ARCHIVE_LIBRARY:
-        ARCHIVE_LIBRARY[meta["track"]].append(item)
-
-def select_task_resources(task_brief: str, track: str) -> list:
-    """
-    Select 2-3 relevant internal resources for this task.
-    """
-    resources = []
-    task_lower = task_brief.lower()
-    
-    for resource_item in ARCHIVE_LIBRARY.get(track, []):
-        if any(tag in task_lower for tag in resource_item["tags"]):
-            resources.append(resource_item)
-    
-    # Always add a general reference hint
-    resources += ARCHIVE_LIBRARY.get("general", [])[:1]
-    
-    return resources[:3]  # max 3 resources
-
-
-
 # --- Main task generation function ---
 async def generate_task(
-    # user_id: int,
     user_name: str,
     track: str,
     deadline_display: str,
@@ -396,240 +147,120 @@ async def generate_task(
     task_number: int = 1,
     user_city: str = None,
     include_ethical_trap: bool = None,
-    model = None,
+    model=None,
     include_video_brief: bool = True,
+    
 ) -> Dict[str, Any]:
-    """
-    Generate a unique, ungoogleable task based on track and difficulty.
-    20-30% of tasks include ethical traps to test professional judgment.
-    """
-    print("track was: ", track)
+    
+    search_query = None  # Ensure always defined
+
     # Normalize track name
-    track_key = track.lower().replace(" ", "_")
-    track_key = track_key.lower().replace("-", "_")
+    track_key = track.lower().replace(" ", "_").replace("-", "_")
     if track_key not in TASK_TEMPLATES:
         track_key = "data_analytics"
-    
-    # Filter templates by difficulty
+
+    # Filter templates
     available_templates = [
         t for t in TASK_TEMPLATES[track_key]
         if difficulty.lower() in t.get("difficulty_levels", ["intermediate"])
     ]
     if not available_templates:
         available_templates = TASK_TEMPLATES[track_key]
-    
+
     template = random.choice(available_templates)
-    
-    # Determine if this task includes ethical trap (20-30% of tasks)
+
     if include_ethical_trap is None:
-        include_ethical_trap = random.random() < 0.25  # 25% chance
-    
-    # Generate random context
+        include_ethical_trap = random.random() < 0.25
+
     industry = random.choice(INDUSTRIES)
     city = user_city or random.choice(NIGERIAN_CITIES)
     company = generate_company_name(industry)
-    
-    # Date context
+
     now = datetime.now()
     month = now.strftime("%B")
     year = now.year
-    
-    # Error causes for data tasks
-    error_causes = [
-        "a currency conversion error",
-        "a data import bug",
-        "manual entry mistakes",
-        "a timezone misconfiguration"
-    ]
 
-    
-    # Format the template
-    # CHECK FOR CURRICULUM OVERRIDE
-    from app.curriculum import get_curriculum_step
+    error_causes = ["a currency conversion error", "a data import bug", "manual entry mistakes", "a timezone misconfiguration"]
+
+    # Curriculum Check
     curriculum = get_curriculum_step(track_key, task_number)
 
-    print("\n\n\ncurriculum formed from track key and task number: ", track_key, task_number)
-    print("model was: ", model)
-    educational_resources = []
-    # attachments = []
+    # -----------------------------
+    # AI Curriculum Mode
+    # -----------------------------
     if curriculum and model:
-        # Generate fully dynamic task based on curriculum
-        company = generate_company_name(industry)
-        
         prompt = f"""
-        Generate a task brief for an intern named "{user_name}" at a {industry} company named {company}, that will not require external file reference for the particular task
+        Generate a realistic workplace task for intern "{user_name}".
+        Topic: {curriculum['topic']}
+        Objective: {curriculum['objective']}
+        Key Concepts: {', '.join(curriculum['key_concepts'])}
+        Company: {company} in {city}
 
-        For the task brief, include:
-        - A professional tone
-        - Clear objectives and deliverables
-        - Submission instructions (always submitting to Emem and Sola)
+        Also provide:
+        "educational_resources": one good Google search query string.
 
-        Under educational_resources below, provide a decent google search query I can use to find resources that would assist the user on the task 
-        
-        **Curriculum Logic:**
-        - Task Number: {task_number}
-        - Topic: {curriculum['topic']}
-        - Learning Objective: {curriculum['objective']}
-        - Key Concepts to Test: {', '.join(curriculum['key_concepts'])}
-        
-        **Context:**
-        - City: {city}
-        - Current Date: {month} {year}
-        
-        **Instructions:**
-        Create a realistic workplace scenario (Task Title and Brief).
-        Address the intern directly by name ("Dear {user_name}").
-        The intern should feel like they are solving a real problem for the business because they are.
-        Include specific data points or file references(e.g. youtube videos, articles, websites).
-        Keep the brief concise, under 250 words.
-
-        **Track Details**
-        DATA ANALYTICS:
-        - Task should reference only datasets that are readily available on the internet, else, should require no dataset or external file
-        - No references to 'attached files', 'above logs', or 'the system' that are not explicitly included in your response.
-
-        DIGITAL MARKETING:
-        - Create marketing campaign briefs and strategies
-        - Include documents like campaign plans, social media content, or analytics reports
-        - Generate realistic marketing data and metrics
-        - No references to 'attached files', 'above logs', or 'the system' that are not explicitly included in your response.
-
-        CYBERSECURITY:
-        **Cybersecurity Task TYPES - Choose ONLY one of these formats:**
-        1. **Policy Drafting**: "Write a 150-word [Policy Area] policy for [infosec concept], covering [specific requirement]."
-        2. **Threat Modeling Workshop**: "Analyze the architecture below for [attack vector]. Identify 2 risks and mitigation steps."
-        3. **Security Audit Simulation**: "Review this simulated finding from a Nessus scan (below) and write a one-paragraph..."
-        4. **Incident Response Exercise**: "Read this summary of a security incident. Outline the first 4 steps your team should take."
-        5. **Compliance Mapping**: "Answer 3 questions about how this process aligns with ISO 27001 control A.x.x."
-        6. **Comparative Analysis**: "Compare these two simulated firewall rule sets. Which is less vulnerable to IP spoofing?"
-        7. **Documentation**: "Write an employee guideline for detecting [type of phishing email] based on 3 indicators."
-
-        **NEVER:** Binaries, packet captures, real IPs, encryption keys, live exploits, or off-the-shelf tool misuse (e.g., 'use Metasploit' without a lab).
-        **SOP (Standard Operating Procedures) for High-Risk Topics:**
-        If curriculum['topic'] is ANY of: ['Backend Systems', 'Server Management', 'Network Admin', 'Linux CLI', 'Cloud Admin']:
-        - ❌ NEVER GENERATE 'live' commands (no SSH, docker, kubectl, vmrun, etc.)
-        - ✅ ONLY USE **simulated data analysis** tasks
-        - ✅ Example: "Analyze this simulated df output" (see block below)
-        - ✅ Example: "Review this sysadmin script for errors" (provide code)
-        - ✅ Example: "Write documentation for this *descriptive* server config"
-
-        **Content Generation Rules:**
-        - If the task needs DATA: Include the full dataset directly in the brief (numbers, sample text, log snippets) as a code block OR use only datasets known to be on Kaggle/public Gdrive (e.g., 'Twitter sentiment dataset', 'Google Analytics sample data', 'NASA weather data').
-        - If the task needs LOGS: Generate a small, self-contained log sample (10-30 lines) right in the brief (with a note: "Simulated Log Sample Below").
-        - If the task needs POLICIES/REPORTS: Generate the base template in full, with placeholders marked clearly (e.g., [COMPANY] input field for firewall rules).
-        - If the task needs CODE SNIPPETS: Provide the code directly in a markdown code block, never reference 'the above code'.
-        - ALWAYS prefer tasks that require the intern to **create**, **analyze**, **research**, or **write** over tasks that require **debugging**, **exploiting**, or **forensics** of unseen systems.
-
-
-        **AI Validator:** Before generating, ask yourself: 'If the intern followed these instructions literally, could they complete the task WITHOUT any file I didn't generate, tool I didn't name, or system I didn't describe?'
-
-        **Output Format (JSON):**
+        Return JSON:
         {{
-            "title": "Professional Task Title",
-            "brief_template": "Concise brief...",
-            "constraints": "Specific constraints..."
-            "educational_resources": "decent one sentence google search query"
+            "title": "...",
+            "brief_template": "...",
+            "constraints": "...",
+            "educational_resources": "search query"
         }}
         """
-        
+
         try:
             response = model.generate_content(prompt)
-            # Simple cleanup to find JSON
-            import json
-            import re
             match = re.search(r"\{.*\}", response.text, re.DOTALL)
+
             if match:
                 gen_data = json.loads(match.group())
-                title = gen_data.get("title")
-                brief = gen_data.get("brief_template")
-                educational_resources = gen_data.get("educational_resources")
-                # attachments = gen_data.get("attachments")
-                template["constraints"] = gen_data.get("constraints") # Override constrains
+                title = gen_data.get("title") or "Generated Task"
+                brief = gen_data.get("brief_template") or "Complete the assigned objective."
+                search_query = gen_data.get("educational_resources") or f"{track} tutorial" 
+                print("DEBUG SEARCH QUERY:", search_query)
+                template["constraints"] = gen_data.get("constraints")
             else:
-                raise ValueError("Failed to parse AI curriculum task")
-                 
-        except (ValueError, RuntimeError, json.JSONDecodeError) as e:
-            print(f"Curriculum generation failed: {e}. Falling back to curriculum-static mode.")
-            # Fallback to Curriculum Static Mode (prevents random tasks)
-            title = f"{curriculum['topic']}: {company}"
-            brief = f"""
-**Topic:** {curriculum['topic']}
-**Objective:** {curriculum['objective']}
+                raise ValueError("AI JSON parse failed")
+        except Exception as e:
+            print(f"Fallback to static due to: {e}")
+            curriculum = None 
 
-Dear {user_name},
-At {company} in {city}, complete the objective above.
-
-**Key Concepts:** {', '.join(curriculum['key_concepts'])}
-
-Use provided tools.
-"""
-            template["constraints"] = "Standard professional constraints apply."
-
-    else:
-        print("\n\n\n no curriculum or model, falling back...\n\n\n")
-        # STANDARD TEMPLATE LOGIC
+    # -----------------------------
+    # Static Template Mode
+    # -----------------------------
+    if not (curriculum and model):
         title = template["title_template"].format(company=company, industry=industry, city=city)
         brief = template["brief_template"].format(
-            company=company,
-            industry=industry,
-            city=city,
-            month=month,
-            year=year,
+            company=company, industry=industry, city=city,
+            month=month, year=year,
             anomaly_count=random.randint(2, 5),
             error_cause=random.choice(error_causes)
         )
-    
-    # ADD ETHICAL TRAP IF APPLICABLE
+        search_query = f"{track} tutorial for beginners"
+        print("DEBUG SEARCH QUERY:", search_query)
+        
+
+    # -----------------------------
+    # Ethical Trap
+    # -----------------------------
     ethical_trap = None
     if include_ethical_trap:
         ethical_trap = generate_ethical_trap(track_key)
-        brief += f"\n\n**⚠️ ETHICAL CONSIDERATION:**\n{ethical_trap['scenario']}\n"
+        brief += f"\n\n⚠️ Ethical Scenario:\n{ethical_trap['scenario']}\n"
 
-    # deadline - 1 day, excluding weekends
+    # -----------------------------
+    # Deadline & Object Assembly
+    # -----------------------------
     deadline = now + timedelta(days=1)
-    while deadline.weekday() >= 5:  # Skip Saturday (5) and Sunday (6)
+    while deadline.weekday() >= 5:
         deadline += timedelta(days=1)
-    # duration_days = (deadline - now).days
+
     deadline_display = format_deadline_display(deadline.isoformat())
 
+ # --- CALL SERPER ---
+    archives = serper_search_links(search_query) if search_query else []
+    print("ARCHIVES RETURNED:", archives)
 
-    # --- Resource selection ---
-    # Pick relevant metadata first
-    # print("\n\n\n task brief", brief)
-    resource_metadata = select_task_resources(brief, track_key)
-        
-    # If model is available, use AI to generate the content dynamically
-    if model:
-        for resource_meta in resource_metadata:
-            try:
-                # Generate dynamic content based on title, brief, and industry context
-                prompt = f"""
-                Create a practical, short "Cheat Sheet" or "Guide" for an intern working on this task:
-                
-                Task: {title}
-                Industry: {industry}
-                Topic: {resource_meta['title']}
-                Tags: {resource_meta['tags']}
-                
-                Include code snippets (if technical), checklists, or step-by-step instructions.
-                Keep it under 200 words. Make it look like a real internal document.
-                """
-                
-                response = model.generate_content(prompt)
-                content = response.text
-                
-                # Clean any broken links from the generated content
-                content = clean_broken_links_sync(content)
-            except (ValueError, RuntimeError, ConnectionError) as e:
-                print(f"Error generating resource content: {e}")
-    else:
-        # Fallback if no model provided
-        educational_resources = [
-            {"title": r["title"], "description": f"Internal Resource ({r['id']})", "content": r["content"]}
-            for r in select_task_resources(brief, track_key)
-        ]
-    
-    # --- Build final task dict ---
     task_dict = {
         "title": title,
         "brief_content": brief.strip(),
@@ -637,13 +268,22 @@ Use provided tools.
         "client_constraints": template.get("constraints"),
         "deadline": deadline.isoformat(),
         "experience_level": experience_level,
-        # "attachments": attachments,
+        "attachments": [
+            {
+                "id": f"{track_key}_{task_number}_brief",
+                "name": f"{company}_Task_Brief.pdf",
+                "type": "pdf",
+                "category": "task_brief",
+                "generated": True
+            }
+        ],
         "ai_persona_config": {
             "role": "Supervisor",
             "tone": "professional",
             "expertise": track,
             "instruction": "Review submission thoroughly",
-            "deadline_display": deadline_display        },
+            "deadline_display": deadline_display
+        },
         "metadata": {
             "company": company,
             "industry": industry,
@@ -652,103 +292,102 @@ Use provided tools.
             "has_ethical_trap": include_ethical_trap,
             "ethical_trap": ethical_trap
         },
-        "educational_resources": serper_search_links(educational_resources, num_results=3),
-        "video_brief": None # placeholder for now
+        "archives": archives,   # ✅ Use variable, not function call again
+        "video_brief": None
     }
 
-    # ---- VIDEO BRIEF (Emem) ----
+    if difficulty.lower() in ["intermediate", "advanced"]:
+        task_dict["attachments"].append({
+            "id": f"{track_key}_{task_number}_support",
+            "name": f"{company}_Supporting_Document.docx",
+            "type": "doc",
+            "category": "supporting_material",
+            "generated": True
+        })
+
+    # -----------------------------
+    # Video Briefing
+    # -----------------------------
     if model and include_video_brief:
-        video_script = await emem.generate_video_brief_script(
-            title,
-            brief,
-            model
-        )
-
-        # Calculate duration based on script length (approx 150 words/minute)
+        video_script = await emem.generate_video_brief_script(title, brief, model)
         word_count = len(video_script.split())
-        duration_seconds = max(30, int((word_count / 150) * 60))  # Min 30 seconds
-
         task_dict["video_brief"] = {
             "agent": "Emem",
             "persona": "Sharp Nigerian Female Executive",
             "accent": "en-NG",
-            "duration_seconds": duration_seconds,
+            "duration_seconds": max(30, int((word_count / 150) * 60)),
             "script": video_script,
             "video_url": None,
             "status": "simulated"
         }
-    # Truncate task brief and/or resources if they exceed specified lengths
-    # max_brief_length = 200
-    # max_resource_length = 300
 
     return task_dict
 
+# --- Search Engine Helper ---
+def serper_search_links(query: str, num_results: int = 3):
+    import os
+    import requests
 
-# ============================================
-# ETHICAL TRAP GENERATION
-# ============================================
+    api_key = os.getenv("SERPER_API_KEY")
+    print("SERPER KEY:", api_key)
 
+    if not api_key:
+        print("SERPER_API_KEY missing")
+        return []
+
+    url = "https://google.serper.dev/search"
+
+    headers = {
+        "X-API-KEY": api_key,
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.post(
+            url,
+            headers=headers,
+            json={"q": query},
+            timeout=10
+        )
+
+        print("SERPER STATUS:", response.status_code)
+        print("SERPER RAW RESPONSE:", response.text[:500])
+
+        response.raise_for_status()
+        data = response.json()
+
+        results = []
+        for item in data.get("organic", [])[:num_results]:
+            results.append({
+                "type": "link",
+                "title": item.get("title"),
+                "url": item.get("link"),
+                "snippet": item.get("snippet")
+            })
+
+        print("SERPER RESULTS COUNT:", len(results))
+        return results
+
+    except Exception as e:
+        print("SERPER ERROR:", e)
+        return []
+
+# --- Ethical Trap Logic ---
 def generate_ethical_trap(track: str) -> Dict[str, str]:
-    """
-    Generate an ethical decision point tailored to the track.
-    Returns {scenario, expected_response, why_it_matters}
-    """
-    
     ethical_traps_by_track = {
         "data_analytics": [
-            {
-                "scenario": "Client wants you to exclude certain demographic groups from the analysis 'because they skew the numbers.' The data clearly shows their inclusion is necessary for accuracy.",
-                "expected_response": "Refuse. Present complete, unbiased analysis. Explain that selective reporting violates professional ethics and could be illegal.",
-                "why_it_matters": "Discrimination law, professional ethics, data integrity"
-            },
-            {
-                "scenario": "Your analysis shows the client's product is underperforming. They ask you to 'adjust the metrics' to show positive results before presenting to investors.",
-                "expected_response": "Refuse. Present honest findings. Suggest alternative interpretations if they exist, but never falsify data.",
-                "why_it_matters": "Fraud prevention, professional integrity, investor protection"
-            },
-            {
-                "scenario": "Client sends you login credentials via email to access their database. Standard practice would be to use an API or secure authentication method.",
-                "expected_response": "Refuse credentials. Ask for secure alternative (API, VPN, proper access management).",
-                "why_it_matters": "Data security, compliance (GDPR/NDPR), credential safety"
-            }
+            {"scenario": "Client wants to exclude certain demographic groups 'because they skew the numbers.'", "expected_response": "Refuse and present unbiased analysis.", "why_it_matters": "Data integrity"},
+            {"scenario": "Client asks you to adjust metrics for investors.", "expected_response": "Refuse. Present honest findings.", "why_it_matters": "Fraud prevention"}
         ],
         "digital_marketing": [
-            {
-                "scenario": "Client asks you to run ads targeting only certain nationalities for a job opening. They claim it's 'market-focused' but it violates employment discrimination laws.",
-                "expected_response": "Refuse. Explain legal risks. Propose legally compliant targeting instead.",
-                "why_it_matters": "Employment law, discrimination law, brand reputation"
-            },
-            {
-                "scenario": "Client says 'Use their competitor's exact ad copy but change a few words. No one will know.' This would violate copyright and IP.",
-                "expected_response": "Refuse. Create original content. If competitor's strategy is good, learn from it legally but create original work.",
-                "why_it_matters": "IP law, professional ethics, legal liability"
-            },
-            {
-                "scenario": "Campaign deadline is in 2 hours, but it's already midnight. Client says 'Just work through the night, I'll pay extra.' Your contract limits hours.",
-                "expected_response": "Refuse overtime pressure. Deliver what's possible in contracted hours or renegotiate deadline/scope.",
-                "why_it_matters": "Labor law, worker wellbeing, sustainable work practices"
-            }
+            {"scenario": "Client asks to target only specific nationalities for a job ad.", "expected_response": "Refuse due to discrimination law.", "why_it_matters": "Compliance"},
+            {"scenario": "Copy-paste competitor's exact ad copy.", "expected_response": "Refuse. Create original work.", "why_it_matters": "IP Law"}
         ],
-        "cybersecurity": [
-            {
-                "scenario": "Client asks you to test their system by trying to crack an employee's password without their consent. They claim it's for security.",
-                "expected_response": "Refuse. Insist on explicit employee consent. Use approved penetration testing protocols.",
-                "why_it_matters": "Consent law, privacy law, ethical hacking standards"
-            },
-            {
-                "scenario": "You discover a critical vulnerability in their system. They ask you to 'keep it quiet' so competitors don't find out. You suggest they fix it.",
-                "expected_response": "Insist on disclosure and remediation. Set a deadline. If not fixed, report to appropriate authorities.",
-                "why_it_matters": "Professional responsibility, customer protection, legal obligation"
-            },
-            {
-                "scenario": "Client wants you to install monitoring software on employee devices 'for security.' There's no employee consent or notification.",
-                "expected_response": "Refuse. Explain privacy law requirements. Propose transparent employee notification and consent.",
-                "why_it_matters": "Privacy law, employee rights, transparent management"
-            }
+        "cyber_security": [
+            {"scenario": "Crack an employee's password without consent.", "expected_response": "Refuse. Require explicit consent.", "why_it_matters": "Privacy Law"},
+            {"scenario": "Hide a critical vulnerability from competitors.", "expected_response": "Insist on disclosure and remediation.", "why_it_matters": "Responsibility"}
         ]
     }
-    
-    track_key = track.lower().replace(" ", "_")
-    available_traps = ethical_traps_by_track.get(track_key, ethical_traps_by_track["data_analytics"])
-    
-    return random.choice(available_traps)
+    track_key = track.lower().replace(" ", "_").replace("-", "_")
+    traps = ethical_traps_by_track.get(track_key, ethical_traps_by_track["data_analytics"])
+    return random.choice(traps)

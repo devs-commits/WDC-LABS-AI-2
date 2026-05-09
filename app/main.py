@@ -18,7 +18,6 @@ WDC Labs AI Backend
 FastAPI application for the immersive virtual office AI system.
 """
 
-
 import os
 import io
 import re
@@ -74,10 +73,17 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Configure CORS
+# Configure CORS - SECURED FOR FRONTEND CONNECTION
+ALLOWED_ORIGINS = [
+    "https://labs.wdc.ng",
+    "https://www.labs.wdc.ng",
+    "http://localhost:3000",
+    "http://localhost:3001"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

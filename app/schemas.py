@@ -3,7 +3,6 @@ from typing import Optional, List, Literal, Dict, Any
 from enum import Enum
 
 
-
 class AgentName(str, Enum):
     TOLU = "Tolu"
     EMEM = "Emem"
@@ -110,6 +109,14 @@ class TaskGenerationResponse(BaseModel):
     tasks: List[GeneratedTask]
 
 
+# --- SOLA 2.0 MULTIMEDIA REMEDIATION ---
+class LearningAsset(BaseModel):
+    topic_tag: str
+    asset_type: str
+    url: str
+    title: str
+
+
 # Work Submission Review
 class SubmissionReviewRequest(BaseModel):
     user_id: str
@@ -126,6 +133,8 @@ class SubmissionReviewResponse(BaseModel):
     feedback: str
     passed: bool
     score: Optional[int] = None
+    error_tag: Optional[str] = None             # Feature ID: REALITY-SOLA-V2
+    learning_asset: Optional[LearningAsset] = None # Feature ID: REALITY-SOLA-V2
     technical_accuracy: Optional[int] = None
     reliability_speed: Optional[int] = None
     communication_score: Optional[int] = None

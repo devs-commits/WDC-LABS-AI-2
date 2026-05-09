@@ -1,5 +1,6 @@
 /venv
 .env
+.env.*
 app/__pycache__
 app/agents/__pycache__
 /__pycache__

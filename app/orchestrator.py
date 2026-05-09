@@ -4,6 +4,7 @@ The Central Brain that routes messages to the appropriate agent.
 """
 from typing import Optional, List
 import google.generativeai as genai
+import re
 
 from .schemas import AgentName, ChatContext, ChatResponse
 from .agents import tolu, emem, sola, kemi, recommender
@@ -252,6 +253,25 @@ Detect the appropriate agent category and respond with ONLY the agent name.
             client_constraints,
             self.model
         )
+
+        # Sola 2.0 Multimedia Remediation Payload Extraction
+        feedback_text = review.get("feedback", "")
+        tag_match = re.search(r'\[(ERR_[A-Z_]+)\]', feedback_text)
+        
+        if tag_match:
+            error_tag = tag_match.group(1)
+            review["error_tag"] = error_tag
+            
+            # This is where the frontend UI expects the learning asset widget payload
+            review["learning_asset"] = {
+                "topic_tag": error_tag,
+                "asset_type": "YOUTUBE_SHORT",
+                "url": f"https://wdclabs.com/assets/{error_tag.lower()}", 
+                "title": f"Quick tutorial on {error_tag.replace('ERR_', '')}"
+            }
+
+            # Strip the system tag from the final user-facing text
+            review["feedback"] = feedback_text.replace(f"[{error_tag}]", "").strip()
 
         if review.get("passed"):
             review["portfolio_bullet"] = await kemi.translate_to_cv_bullet(

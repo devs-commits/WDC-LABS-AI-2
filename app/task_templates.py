@@ -190,11 +190,13 @@ async def generate_task(
     # -----------------------------
     if curriculum and model:
         prompt = f"""
-        Generate a realistic workplace task for intern "{user_name}".
+        Generate a realistic workplace task brief for intern "{user_name}".
         Topic: {curriculum['topic']}
         Objective: {curriculum['objective']}
         Key Concepts: {', '.join(curriculum['key_concepts'])}
         Company: {company} in {city}
+
+        CRITICAL REQUIREMENT for SOLA 2.0: The brief MUST explicitly ask the intern to submit a tangible file (.csv, .xlsx, .pdf, .docx, .py, or .sql) corresponding to their work so the Technical Lead can review it.
 
         Also provide:
         "educational_resources": one good Google search query string.
@@ -292,7 +294,7 @@ async def generate_task(
             "has_ethical_trap": include_ethical_trap,
             "ethical_trap": ethical_trap
         },
-        "archives": archives,   # ✅ Use variable, not function call again
+        "archives": archives,
         "video_brief": None
     }
 

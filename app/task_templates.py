@@ -13,10 +13,9 @@ from datetime import datetime, timedelta
 
 # Internal app imports
 from app.utils.deadline_formatter import format_deadline_display
-from app.utils.link_verifier import clean_broken_links_sync
 from app.curriculum import get_curriculum_step
 from .agents import emem
-from app.utils.db import get_cached_search, save_cached_search # <--- Added DB imports
+from app.utils.db import get_cached_search, save_cached_search
 
 # --- Industry contexts for task variation ---
 INDUSTRIES = [
@@ -35,7 +34,6 @@ NIGERIAN_CITIES = [
     "Yobe", "Zamfara"
 ]
 
-# --- Company name generators ---
 COMPANY_PREFIXES = ["Tech", "Smart", "Prime", "Nova", "Apex", "Swift", "Core", "Global"]
 COMPANY_SUFFIXES = ["Hub", "Labs", "Solutions", "Systems", "Ventures", "Group", "Corp"]
 
@@ -63,11 +61,10 @@ def inject_data_anomalies(data: List[Dict], anomaly_count: int = 3) -> tuple:
         row_idx = random.randint(0, len(data) - 1)
         anomaly_type = random.choice(anomaly_types)
         
-        if anomaly_type == "currency_conversion_error":
-            if "revenue" in data[row_idx]:
-                original = data[row_idx]["revenue"]
-                data[row_idx]["revenue"] = original * 1500  # NGN to USD error
-                anomalies.append(f"Row {row_idx + 1}: Currency conversion error in revenue")
+        if anomaly_type == "currency_conversion_error" and "revenue" in data[row_idx]:
+            original = data[row_idx]["revenue"]
+            data[row_idx]["revenue"] = original * 1500  # NGN to USD error
+            anomalies.append(f"Row {row_idx + 1}: Currency conversion error in revenue")
         
         elif anomaly_type == "duplicate_row":
             data.insert(row_idx + 1, data[row_idx].copy())
@@ -78,10 +75,9 @@ def inject_data_anomalies(data: List[Dict], anomaly_count: int = 3) -> tuple:
             data[row_idx][field] = None
             anomalies.append(f"Row {row_idx + 1}: Missing value in {field}")
         
-        elif anomaly_type == "date_format_error":
-            if "date" in data[row_idx]:
-                data[row_idx]["date"] = data[row_idx]["date"].replace("-", "/")
-                anomalies.append(f"Row {row_idx + 1}: Inconsistent date format")
+        elif anomaly_type == "date_format_error" and "date" in data[row_idx]:
+            data[row_idx]["date"] = data[row_idx]["date"].replace("-", "/")
+            anomalies.append(f"Row {row_idx + 1}: Inconsistent date format")
         
         elif anomaly_type == "decimal_shift":
             for key in data[row_idx]:
@@ -150,10 +146,9 @@ async def generate_task(
     include_ethical_trap: bool = None,
     model=None,
     include_video_brief: bool = True,
-    
 ) -> Dict[str, Any]:
     
-    search_query = None  # Ensure always defined
+    search_query = None
 
     # Normalize track name
     track_key = track.lower().replace(" ", "_").replace("-", "_")
@@ -220,7 +215,6 @@ async def generate_task(
                 title = gen_data.get("title") or "Generated Task"
                 brief = gen_data.get("brief_template") or "Complete the assigned objective."
                 search_query = gen_data.get("educational_resources") or f"{track} tutorial" 
-                print("DEBUG SEARCH QUERY:", search_query)
                 template["constraints"] = gen_data.get("constraints")
             else:
                 raise ValueError("AI JSON parse failed")
@@ -240,8 +234,6 @@ async def generate_task(
             error_cause=random.choice(error_causes)
         )
         search_query = f"{track} tutorial for beginners"
-        print("DEBUG SEARCH QUERY:", search_query)
-        
 
     # -----------------------------
     # Ethical Trap
@@ -296,11 +288,114 @@ async def generate_task(
         "client_constraints": template.get("constraints"),
         "deadline": deadline.isoformat(),
         "experience_level": experience_level,
-        "attachments": [], # <--- REDUNDANT PDF REMOVED
-        "resources": fetched_resources, # <--- RICH DATA ADDED
+        "attachments": [], 
+        "resources": fetched_resources, 
         "ai_persona_config": {
             "role": "Supervisor",
             "tone": "professional",
             "expertise": track,
             "instruction": "Review submission thoroughly",
-            "deadline_display": deadline_
+            "deadline_display": deadline_display
+        },
+        "metadata": {
+            "company": company,
+            "industry": industry,
+            "city": city,
+            "task_number": task_number,
+            "has_ethical_trap": include_ethical_trap,
+            "ethical_trap": ethical_trap
+        },
+        "video_brief": None
+    }
+
+    # Only add supporting dummy docs if it's an advanced task
+    if difficulty.lower() in ["intermediate", "advanced"]:
+        task_dict["attachments"].append({
+            "id": f"{track_key}_{task_number}_support",
+            "name": f"{company}_Supporting_Document.docx",
+            "type": "doc",
+            "category": "supporting_material",
+            "generated": True
+        })
+
+    # -----------------------------
+    # Video Briefing
+    # -----------------------------
+    if model and include_video_brief:
+        video_script = await emem.generate_video_brief_script(title, brief, model)
+        word_count = len(video_script.split())
+        task_dict["video_brief"] = {
+            "agent": "Emem",
+            "persona": "Sharp Nigerian Female Executive",
+            "accent": "en-NG",
+            "duration_seconds": max(30, int((word_count / 150) * 60)),
+            "script": video_script,
+            "video_url": None,
+            "status": "simulated"
+        }
+
+    return task_dict
+
+# --- Search Engine Helper ---
+def serper_search_links(query: str, num_results: int = 3):
+    import os
+    import requests
+
+    api_key = os.getenv("SERPER_API_KEY")
+
+    if not api_key:
+        print("SERPER_API_KEY missing")
+        return []
+
+    url = "https://google.serper.dev/search"
+
+    headers = {
+        "X-API-KEY": api_key,
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.post(
+            url,
+            headers=headers,
+            json={"q": query},
+            timeout=10
+        )
+
+        response.raise_for_status()
+        data = response.json()
+
+        results = []
+        for item in data.get("organic", [])[:num_results]:
+            results.append({
+                "type": "link",
+                "title": item.get("title"),
+                "url": item.get("link"),
+                "snippet": item.get("snippet")
+            })
+
+        return results
+
+    except Exception as e:
+        print("SERPER ERROR:", e)
+        return []
+
+# --- Ethical Trap Logic ---
+def generate_ethical_trap(track: str) -> Dict[str, str]:
+    ethical_traps_by_track = {
+        "data_analytics": [
+            {"scenario": "Client wants to exclude certain demographic groups 'because they skew the numbers.'", "expected_response": "Refuse and present unbiased analysis.", "why_it_matters": "Data integrity"},
+            {"scenario": "Client asks you to adjust metrics for investors.", "expected_response": "Refuse. Present honest findings.", "why_it_matters": "Fraud prevention"}
+        ],
+        "digital_marketing": [
+            {"scenario": "Client asks to target only specific nationalities for a job ad.", "expected_response": "Refuse due to discrimination law.", "why_it_matters": "Compliance"},
+            {"scenario": "Copy-paste competitor's exact ad copy.", "expected_response": "Refuse. Create original work.", "why_it_matters": "IP Law"}
+        ],
+        "cyber_security": [
+            {"scenario": "Crack an employee's password without consent.", "expected_response": "Refuse. Require explicit consent.", "why_it_matters": "Privacy Law"},
+            {"scenario": "Hide a critical vulnerability from competitors.", "expected_response": "Insist on disclosure and remediation.", "why_it_matters": "Responsibility"}
+        ]
+    }
+    track_key = track.lower().replace(" ", "_").replace("-", "_")
+    traps = ethical_traps_by_track.get(track_key, ethical_traps_by_track["data_analytics"])
+    return random.choice(traps)

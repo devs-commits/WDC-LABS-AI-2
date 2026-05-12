@@ -298,7 +298,8 @@ async def review_submission(request: SubmissionReviewRequest):
             task_title=request.task_title,
             task_brief=request.task_brief,
             submission_content=file_content or request.file_content or "No content provided",
-            client_constraints=None
+            client_constraints=None,
+            attempt_number=request.attempt_number # <--- PASSED ATTEMPT NUMBER TO ORCHESTRATOR
         )
         
         return SubmissionReviewResponse(
@@ -315,9 +316,6 @@ async def review_submission(request: SubmissionReviewRequest):
         raise HTTPException(status_code=500, detail=f"Review failed: {str(e)}") from e
 
 # ============ TASK GENERATION ============
-
-from pydantic import BaseModel
-from typing import Optional
 
 class TaskRequest(BaseModel):
     user_name: str
@@ -346,59 +344,6 @@ async def generate_tasks(req: TaskRequest):
     )
 
     return {"tasks": [task]}
-
-
-# ============ RESOURCE GENERATION ============
-
-# @app.post("/generate-resource", response_model=ResourceGenerationResponse)
-# async def generate_resource(req: ResourceGenerationRequest):
-#     try:
-#         prompt = f"""
-#         Generate a helpful educational resource based on this query:
-        
-#         Query: {req.query}
-#         Track: {req.track}
-#         User Level: {req.user_level or 'General'}
-#         Task Context: {req.task_context or 'None'}
-        
-#         Create a resource with:
-#         - Title: A clear, descriptive title
-#         - Category: One word category (e.g., Tutorial, Guide, Reference, Example)
-#         - Content: Markdown-formatted content with practical information
-        
-#         Keep content under 500 words. Make it educational and relevant.
-#         Do NOT include any external links or URLs - focus on internal knowledge.
-#         """
-        
-#         response = await model.generate_content_async(prompt)
-#         content = response.text
-        
-#         # Clean any potential broken links (though we instructed not to include)
-#         from app.utils.link_verifier import clean_broken_links
-#         content = await clean_broken_links(content)
-        
-#         # Parse the response to extract title, category, content
-#         lines = content.split('\n')
-#         title = "Generated Resource"
-#         category = "Guide"
-#         content_body = content
-        
-#         for i, line in enumerate(lines):
-#             if line.startswith('Title:'):
-#                 title = line.replace('Title:', '').strip()
-#             elif line.startswith('Category:'):
-#                 category = line.replace('Category:', '').strip()
-#             elif line.startswith('Content:'):
-#                 content_body = '\n'.join(lines[i+1:]).strip()
-#                 break
-        
-#         return ResourceGenerationResponse(
-#             title=title,
-#             category=category,
-#             content=content_body
-#         )
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
 
 # ============ STARTUP ============ 
 

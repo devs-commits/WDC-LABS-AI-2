@@ -16,6 +16,7 @@ from app.utils.deadline_formatter import format_deadline_display
 from app.utils.link_verifier import clean_broken_links_sync
 from app.curriculum import get_curriculum_step
 from .agents import emem
+from app.utils.db import get_cached_search, save_cached_search # <--- Added DB imports
 
 # --- Industry contexts for task variation ---
 INDUSTRIES = [
@@ -251,7 +252,7 @@ async def generate_task(
         brief += f"\n\n⚠️ Ethical Scenario:\n{ethical_trap['scenario']}\n"
 
     # -----------------------------
-    # Deadline & Object Assembly
+    # Deadline
     # -----------------------------
     deadline = now + timedelta(days=1)
     while deadline.weekday() >= 5:
@@ -259,10 +260,35 @@ async def generate_task(
 
     deadline_display = format_deadline_display(deadline.isoformat())
 
- # --- CALL SERPER ---
-    archives = serper_search_links(search_query) if search_query else []
-    print("ARCHIVES RETURNED:", archives)
+    # -----------------------------
+    # CACHED SERPER SEARCH
+    # -----------------------------
+    fetched_resources = []
+    if search_query:
+        # 1. Check if we already paid for this search
+        cached_results = await get_cached_search(search_query)
+        
+        if cached_results:
+            print("CACHE HIT! Serving resources from DB for:", search_query)
+            fetched_resources = cached_results
+        else:
+            print("CACHE MISS! Calling Serper for:", search_query)
+            serper_results = serper_search_links(search_query + " youtube tutorial OR practical guide")
+            for res in serper_results:
+                fetched_resources.append({
+                    "link": res.get("url"),
+                    "title": res.get("title"),
+                    "description": res.get("snippet")
+                })
+            
+            # 2. Save it for the next intern
+            if fetched_resources:
+                await save_cached_search(search_query, fetched_resources)
 
+
+    # -----------------------------
+    # Object Assembly
+    # -----------------------------
     task_dict = {
         "title": title,
         "brief_content": brief.strip(),
@@ -270,126 +296,11 @@ async def generate_task(
         "client_constraints": template.get("constraints"),
         "deadline": deadline.isoformat(),
         "experience_level": experience_level,
-        "attachments": [
-            {
-                "id": f"{track_key}_{task_number}_brief",
-                "name": f"{company}_Task_Brief.pdf",
-                "type": "pdf",
-                "category": "task_brief",
-                "generated": True
-            }
-        ],
+        "attachments": [], # <--- REDUNDANT PDF REMOVED
+        "resources": fetched_resources, # <--- RICH DATA ADDED
         "ai_persona_config": {
             "role": "Supervisor",
             "tone": "professional",
             "expertise": track,
             "instruction": "Review submission thoroughly",
-            "deadline_display": deadline_display
-        },
-        "metadata": {
-            "company": company,
-            "industry": industry,
-            "city": city,
-            "task_number": task_number,
-            "has_ethical_trap": include_ethical_trap,
-            "ethical_trap": ethical_trap
-        },
-        "archives": archives,
-        "video_brief": None
-    }
-
-    if difficulty.lower() in ["intermediate", "advanced"]:
-        task_dict["attachments"].append({
-            "id": f"{track_key}_{task_number}_support",
-            "name": f"{company}_Supporting_Document.docx",
-            "type": "doc",
-            "category": "supporting_material",
-            "generated": True
-        })
-
-    # -----------------------------
-    # Video Briefing
-    # -----------------------------
-    if model and include_video_brief:
-        video_script = await emem.generate_video_brief_script(title, brief, model)
-        word_count = len(video_script.split())
-        task_dict["video_brief"] = {
-            "agent": "Emem",
-            "persona": "Sharp Nigerian Female Executive",
-            "accent": "en-NG",
-            "duration_seconds": max(30, int((word_count / 150) * 60)),
-            "script": video_script,
-            "video_url": None,
-            "status": "simulated"
-        }
-
-    return task_dict
-
-# --- Search Engine Helper ---
-def serper_search_links(query: str, num_results: int = 3):
-    import os
-    import requests
-
-    api_key = os.getenv("SERPER_API_KEY")
-    print("SERPER KEY:", api_key)
-
-    if not api_key:
-        print("SERPER_API_KEY missing")
-        return []
-
-    url = "https://google.serper.dev/search"
-
-    headers = {
-        "X-API-KEY": api_key,
-        "Content-Type": "application/json"
-    }
-
-    try:
-        response = requests.post(
-            url,
-            headers=headers,
-            json={"q": query},
-            timeout=10
-        )
-
-        print("SERPER STATUS:", response.status_code)
-        print("SERPER RAW RESPONSE:", response.text[:500])
-
-        response.raise_for_status()
-        data = response.json()
-
-        results = []
-        for item in data.get("organic", [])[:num_results]:
-            results.append({
-                "type": "link",
-                "title": item.get("title"),
-                "url": item.get("link"),
-                "snippet": item.get("snippet")
-            })
-
-        print("SERPER RESULTS COUNT:", len(results))
-        return results
-
-    except Exception as e:
-        print("SERPER ERROR:", e)
-        return []
-
-# --- Ethical Trap Logic ---
-def generate_ethical_trap(track: str) -> Dict[str, str]:
-    ethical_traps_by_track = {
-        "data_analytics": [
-            {"scenario": "Client wants to exclude certain demographic groups 'because they skew the numbers.'", "expected_response": "Refuse and present unbiased analysis.", "why_it_matters": "Data integrity"},
-            {"scenario": "Client asks you to adjust metrics for investors.", "expected_response": "Refuse. Present honest findings.", "why_it_matters": "Fraud prevention"}
-        ],
-        "digital_marketing": [
-            {"scenario": "Client asks to target only specific nationalities for a job ad.", "expected_response": "Refuse due to discrimination law.", "why_it_matters": "Compliance"},
-            {"scenario": "Copy-paste competitor's exact ad copy.", "expected_response": "Refuse. Create original work.", "why_it_matters": "IP Law"}
-        ],
-        "cyber_security": [
-            {"scenario": "Crack an employee's password without consent.", "expected_response": "Refuse. Require explicit consent.", "why_it_matters": "Privacy Law"},
-            {"scenario": "Hide a critical vulnerability from competitors.", "expected_response": "Insist on disclosure and remediation.", "why_it_matters": "Responsibility"}
-        ]
-    }
-    track_key = track.lower().replace(" ", "_").replace("-", "_")
-    traps = ethical_traps_by_track.get(track_key, ethical_traps_by_track["data_analytics"])
-    return random.choice(traps)
+            "deadline_display": deadline_

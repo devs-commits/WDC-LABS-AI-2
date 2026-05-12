@@ -126,6 +126,7 @@ class SubmissionReviewRequest(BaseModel):
     task_title: str
     task_brief: str
     chat_history: Optional[List[dict]] = []
+    attempt_number: int = 1  # <--- ADDED: Tracks submission attempts
 
 
 class SubmissionReviewResponse(BaseModel):
@@ -133,8 +134,8 @@ class SubmissionReviewResponse(BaseModel):
     feedback: str
     passed: bool
     score: Optional[int] = None
-    error_tag: Optional[str] = None             # Feature ID: REALITY-SOLA-V2
-    learning_asset: Optional[LearningAsset] = None # Feature ID: REALITY-SOLA-V2
+    error_tag: Optional[str] = None             
+    learning_asset: Optional[LearningAsset] = None 
     technical_accuracy: Optional[int] = None
     reliability_speed: Optional[int] = None
     communication_score: Optional[int] = None
@@ -156,7 +157,7 @@ class PortfolioBulletResponse(BaseModel):
 # Mock Interview
 class MockInterviewRequest(BaseModel):
     interview_type: Literal["behavioral", "technical", "situational"]
-    interview_subtype: Optional[str] = None # e.g. "conflict", "leadership"
+    interview_subtype: Optional[str] = None 
     question_number: int
     previous_answer: Optional[str] = None
 
@@ -176,13 +177,13 @@ class OnboardingIntroRequest(BaseModel):
     user_name: str
     track: str
     user_level: Optional[str] = None
-    bio_summary: Optional[str] = None  # Brief summary of user's background
+    bio_summary: Optional[str] = None  
 
 
 class OnboardingIntroMessage(BaseModel):
     agent: AgentName
     message: str
-    typing_delay_ms: int  # Delay before showing this message (simulates typing)
+    typing_delay_ms: int  
 
 
 class OnboardingIntroResponse(BaseModel):
@@ -193,14 +194,14 @@ class OnboardingIntroResponse(BaseModel):
 class ResourceGenerationRequest(BaseModel):
     query: str
     track: str
-    task_context: Optional[str] = None  # Title/Description of current task
+    task_context: Optional[str] = None  
     user_level: Optional[str] = None
 
 
 class ResourceGenerationResponse(BaseModel):
     title: str
     category: str
-    content: str  # Markdown content
+    content: str  
 
 
 class RecommendationLetterRequest(BaseModel):
@@ -220,7 +221,7 @@ class RecommendationLetterResponse(BaseModel):
 class OrchestratorInput(BaseModel):
     message: str
     current_task_id: Optional[str] = None
-    uploaded_file: Optional[str] = None  # placeholder for now
+    uploaded_file: Optional[str] = None  
     user_region: str = "NG"
     user_level: int = 0
     user_track: Optional[str] = None

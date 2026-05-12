@@ -96,7 +96,6 @@ Kemi
 
         # AI-POWERED CATEGORY DETECTION
         try:
-            # return AgentName.SOLA  # temporary
             context_info = f"""
 User Level: {context.user_level or 'Unknown'}
 Track: {context.track or 'Unknown'}
@@ -126,7 +125,6 @@ Detect the appropriate agent category and respond with ONLY the agent name.
 
             detected_agent = agent_map.get(agent_raw, None)
             
-            # If AI detection failed, use fallback
             if detected_agent is None:
                 print(f"[ORCHESTRATOR] AI detection unclear: '{agent_raw}' - using fallback")
                 return self._fallback_routing(msg)
@@ -140,27 +138,18 @@ Detect the appropriate agent category and respond with ONLY the agent name.
     def _fallback_routing(self, msg: str) -> AgentName:
         """Fallback routing using heuristic rules (safe & reliable)"""
         
-        # Emotional/Career support keywords
         emotional_keywords = ["worried", "scared", "help", "struggle", "stuck", "confused", "lost", "scared", "anxious", "stressed"]
         career_keywords = ["resume", "cv", "interview", "portfolio", "career", "confidence", "skill", "growth", "job"]
-        
-        # Task/Project keywords
         task_keywords = ["deadline", "brief", "task", "project", "client", "deliverable", "submit", "due", "when"]
-        
-        # Technical keywords
         tech_keywords = ["code", "debug", "error", "bug", "function", "variable", "syntax", "python", "javascript", "fix"]
-        
-        # HR/Admin keywords
         hr_keywords = ["salary", "contract", "policy", "certificate", "certificate", "onboarding", "admin", "hours", "leave"]
         
-        # Count keyword matches
         emotional_count = sum(1 for k in emotional_keywords if k in msg)
         career_count = sum(1 for k in career_keywords if k in msg)
         task_count = sum(1 for k in task_keywords if k in msg)
         tech_count = sum(1 for k in tech_keywords if k in msg)
         hr_count = sum(1 for k in hr_keywords if k in msg)
         
-        # Route based on highest score
         scores = {
             AgentName.KEMI: emotional_count + career_count,
             AgentName.EMEM: task_count,
@@ -170,7 +159,6 @@ Detect the appropriate agent category and respond with ONLY the agent name.
         
         best_agent = max(scores, key=scores.get)
         
-        # If no clear winner, default to Sola (technical)
         if all(v == 0 for v in scores.values()):
             return AgentName.SOLA
         
@@ -243,7 +231,8 @@ Detect the appropriate agent category and respond with ONLY the agent name.
         task_title: str,
         task_brief: str,
         submission_content: str,
-        client_constraints: Optional[str] = None
+        client_constraints: Optional[str] = None,
+        attempt_number: int = 1 # <--- CAPTURE ATTEMPT NUMBER
     ) -> dict:
 
         review = await sola.review_submission(
@@ -251,7 +240,8 @@ Detect the appropriate agent category and respond with ONLY the agent name.
             task_brief,
             submission_content,
             client_constraints,
-            self.model
+            self.model,
+            attempt_number      # <--- PASS TO SOLA
         )
 
         # Sola 2.0 Multimedia Remediation Payload Extraction
@@ -262,7 +252,6 @@ Detect the appropriate agent category and respond with ONLY the agent name.
             error_tag = tag_match.group(1)
             review["error_tag"] = error_tag
             
-            # This is where the frontend UI expects the learning asset widget payload
             review["learning_asset"] = {
                 "topic_tag": error_tag,
                 "asset_type": "YOUTUBE_SHORT",
@@ -270,7 +259,6 @@ Detect the appropriate agent category and respond with ONLY the agent name.
                 "title": f"Quick tutorial on {error_tag.replace('ERR_', '')}"
             }
 
-            # Strip the system tag from the final user-facing text
             review["feedback"] = feedback_text.replace(f"[{error_tag}]", "").strip()
 
         if review.get("passed"):

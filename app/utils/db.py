@@ -34,3 +34,35 @@ async def get_learning_asset(topic_tag: str) -> dict:
     except Exception as e:
         print(f"[DB] Error fetching learning asset for {topic_tag}: {e}")
         return None
+
+# --- NEW CACHING FUNCTIONS FOR SERPER ---
+
+async def get_cached_search(query: str) -> list:
+    """
+    Checks if we have already performed this Google Search to save API costs.
+    """
+    if not supabase:
+        return None
+    try:
+        response = supabase.table("search_cache").select("results").eq("query", query).limit(1).execute()
+        if response.data and len(response.data) > 0:
+            return response.data[0]["results"]
+        return None
+    except Exception as e:
+        print(f"[DB] Error reading cache for query '{query}': {e}")
+        return None
+
+async def save_cached_search(query: str, results: list):
+    """
+    Saves a fresh Google Search to the database so future interns get it for free.
+    """
+    if not supabase:
+        return
+    try:
+        # Upsert ensures if the query already exists, it just updates the results
+        supabase.table("search_cache").upsert({
+            "query": query, 
+            "results": results
+        }).execute()
+    except Exception as e:
+        print(f"[DB] Error saving cache for query '{query}': {e}")

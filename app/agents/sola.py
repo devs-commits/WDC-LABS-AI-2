@@ -13,25 +13,18 @@ def get_system_prompt() -> str:
     with open(PROMPT_PATH, "r", encoding="utf-8") as f:
         return f.read()
 
-from typing import Optional
-
 def respond(message: str, context: Optional[dict] = None) -> str:
     """Simple response placeholder for Sola."""
     return "Sola response placeholder"
 
 def select_task_resources(task_brief: str, track: str) -> list:
     resources = []
-
     task_lower = task_brief.lower()
-
     for item in ARCHIVE_LIBRARY.get(track, []):
         if any(tag in task_lower for tag in item["tags"]):
             resources.append(item)
-
-    # Always add one general workflow hint
     resources += ARCHIVE_LIBRARY.get("general", [])[:1]
-
-    return resources[:3]  # hard limit
+    return resources[:3]
 
 
 async def review_submission(
@@ -39,22 +32,64 @@ async def review_submission(
     task_brief: str,
     submission_content: str,
     client_constraints: Optional[str],
-    model: genai.GenerativeModel
+    model: genai.GenerativeModel,
+    attempt_number: int = 1  # <--- Added attempt tracking
 ) -> dict:
     """
     Review a user's submission as Sola (Technical Lead).
-    
-    Implements the 60% Rejection Rule - rejects unless work is excellent.
-    Handles both text submissions and file content.
-    
-    Returns:
-        dict with feedback, passed (bool), score (0-100), improvement_points
+    Implements the 3-Strike Rule and Final Evaluation Mode.
     """
     system_prompt = get_system_prompt()
     
     # Truncate very long submissions to avoid token limits
     submission_preview = submission_content[:3000] if len(submission_content) > 3000 else submission_content
     
+    # --- 3-TRIAL LIMIT LOGIC ---
+    if attempt_number >= 3:
+        evaluation_rules = """
+        🚨 FINAL EVALUATION MODE TRIGGERED (Attempt 3 of 3).
+        Stop iterative coaching. Conduct a full end-to-end assessment of the learner’s submission.
+        Identify and present ALL remaining issues, weaknesses, inconsistencies, and missing requirements in a single response.
+        Do not withhold additional feedback for future revisions.
+        Evaluate strictly according to the assignment brief and evidence presented.
+        Shift from iterative coaching to comprehensive final assessment.
+        
+        The 'feedback' string MUST follow this EXACT format using Markdown headers:
+        
+        ### 1. Overall Evaluation
+        [Concise summary of overall quality]
+        
+        ### 2. Strengths
+        [What was done correctly and effectively]
+        
+        ### 3. Weaknesses
+        [All remaining analytical, structural, factual, or methodological issues]
+        
+        ### 4. Missing, Unsupported, or Incorrect Requirements
+        [Explicitly identify missing requirements, unsupported assumptions, or deviations]
+        
+        ### 5. Recommendations for Improvement
+        [Actionable suggestions for professional growth]
+        
+        ### 6. Final Score
+        [Score out of 100%]
+        
+        Respond ONLY with valid JSON on a single line (no markdown blocks around the JSON):
+        {"feedback": "Formatted final evaluation report matching the required structure above", "passed": true_or_false, "score": integer_0_to_100, "improvement_points": ["Point 1", "Point 2"]}
+        """
+    else:
+        evaluation_rules = f"""
+        ITERATIVE COACHING MODE (Attempt {attempt_number} of 3).
+        1. Check if submission addresses the task requirements.
+        2. Check code/analytical quality and professionalism.
+        3. Check if client constraints were followed.
+        4. Apply the 60% Rejection Rule - reject unless truly excellent.
+        5. Focus on major blockers; do not reveal every single micro-flaw if they are overwhelming. Save detailed grading for Attempt 3.
+        
+        Respond ONLY with valid JSON on a single line (no markdown blocks around the JSON):
+        {{"feedback": "Your detailed coaching message", "passed": true_or_false, "score": integer_0_to_100, "improvement_points": ["Point 1"]}}
+        """
+
     prompt = f"""
 {system_prompt}
 
@@ -64,6 +99,7 @@ async def review_submission(
 Title: {task_title}
 Brief: {task_brief}
 Client Constraints: {client_constraints or "None specified"}
+Attempt Number: {attempt_number}/3
 
 **USER'S SUBMISSION:**
 \"\"\"
@@ -71,49 +107,33 @@ Client Constraints: {client_constraints or "None specified"}
 \"\"\"
 
 **REVIEW INSTRUCTIONS:**
-1. Check if submission addresses the task requirements
-2. Check code quality (if applicable): variable names, structure, comments
-3. Check if client constraints were followed
-4. Check formatting and professionalism
-5. Apply the 60% Rejection Rule - only approve truly excellent work
-
-IMPORTANT: Respond ONLY with valid JSON on a single line (no markdown, no code blocks):
-{{"feedback": "Your detailed feedback message", "passed": true, "score": 85, "improvement_points": ["Point 1", "Point 2"]}}
-
-Remember: You reject 60% of first drafts. Be thorough but fair.
+{evaluation_rules}
 """
 
     try:
         response = await model.generate_content_async(prompt)
         text = response.text.strip()
         
-        # Remove markdown code blocks if present
+        # Clean markdown code blocks from response
         if text.startswith("```"):
-            # Find the closing ```
             lines = text.split('\n')
             if len(lines) > 1:
-                # Remove first line (opening ```)
                 text = '\n'.join(lines[1:])
-                # Remove last line if it's closing ```
                 if text.endswith("```"):
                     text = text[:-3]
         
-        # Try to find JSON in the text
         import re
         json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
         
         if json_match:
             json_str = json_match.group(0)
             result = json.loads(json_str)
-            
-            # Validate required fields
             if isinstance(result, dict) and "feedback" in result and "passed" in result:
-                # Ensure score is present
                 if "score" not in result:
                     result["score"] = 50
                 return result
         
-        # If no valid JSON found, try to parse the whole text
+        # Fallback parsing
         result = json.loads(text)
         if isinstance(result, dict) and "feedback" in result and "passed" in result:
             if "score" not in result:
@@ -121,14 +141,13 @@ Remember: You reject 60% of first drafts. Be thorough but fair.
             return result
             
     except (json.JSONDecodeError, AttributeError, IndexError) as e:
-        pass
+        print(f"[SOLA ERROR] JSON parsing failed: {e}")
     
-    # Fallback - return a generic response with the AI's feedback
     return {
-        "feedback": response.text if response else "Unable to generate review. Please resubmit with clearer content.",
+        "feedback": "Unable to generate review due to a system error. Please resubmit your work.",
         "passed": False,
         "score": 0,
-        "improvement_points": ["Please ensure submission is clear and complete", "Resubmit for review"]
+        "improvement_points": ["System parsing error occurred"]
     }
 
 
@@ -180,7 +199,6 @@ async def interrogate_submission(
 ) -> str:
     """
     The "Socratic Defense" - interrogate why the user made specific choices.
-    This catches copied/AI-generated work since users can't defend choices they didn't make.
     """
     system_prompt = get_system_prompt()
     

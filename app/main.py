@@ -181,13 +181,13 @@ def is_safe_external_url(url: str) -> bool:
 
 def prune_task_title(task_title: str) -> str:
     """
-    Smart query pruning.
-    Removes filler words and keeps
-    the first 4 meaningful keywords.
+    Smart query pruning wrapper.
+    Removes filler/stop words and captures the top 4 
+    highly meaningful subject keywords for precision searching.
     """
     stop_words = {
         "a", "an", "the", "for", "to", "with", "and", "of", "in", "on",
-        "using", "build", "create", "develop", "design"
+        "using", "build", "create", "develop", "design", "challenge"
     }
 
     words = re.findall(
@@ -638,13 +638,8 @@ async def fetch_serper_resources(
     discovered_links: List[str] = []
     cache_results: List[Dict[str, Any]] = []
 
-    pruned_title = prune_task_title(
-        task_title
-    )
-
-    logger.info(
-        f"SEARCH QUERY TITLE: {pruned_title}"
-    )
+    pruned_title = prune_task_title(task_title)
+    logger.info(f"SEARCH QUERY TITLE: {pruned_title}")
 
     async with httpx.AsyncClient(
         timeout=10.0
@@ -669,15 +664,9 @@ async def fetch_serper_resources(
             )
 
             if web_res.status_code == 200:
-                data = safe_json_response(
-                    web_res
-                )
-                organic = data.get(
-                    "organic",
-                    []
-                )
+                data = safe_json_response(web_res)
+                organic = data.get("organic", [])
 
-                # Fallback strategy
                 if not organic:
                     fallback_query = (
                         f"{track} "
@@ -692,13 +681,8 @@ async def fetch_serper_resources(
                             "num": 4
                         }
                     )
-                    data = safe_json_response(
-                        web_res
-                    )
-                    organic = data.get(
-                        "organic",
-                        []
-                    )
+                    data = safe_json_response(web_res)
+                    organic = data.get("organic", [])
 
                 for item in organic:
                     if not isinstance(item, dict):
@@ -725,18 +709,12 @@ async def fetch_serper_resources(
                             "snippet",
                             "Official reference material."
                         ),
-                        "type": (
-                            "pdf"
-                            if is_pdf
-                            else "web"
-                        ),
+                        "type": "pdf" if is_pdf else "web",
                         "category": "Reference Links"
                     })
 
         except Exception as e:
-            logger.error(
-                f"DOCUMENT SEARCH ERROR: {str(e)}"
-            )
+            logger.error(f"DOCUMENT SEARCH ERROR: {str(e)}")
 
         # ====================================================
         # VIDEO SWEEP
@@ -757,13 +735,8 @@ async def fetch_serper_resources(
             )
 
             if video_res.status_code == 200:
-                data = safe_json_response(
-                    video_res
-                )
-                videos = data.get(
-                    "videos",
-                    []
-                )
+                data = safe_json_response(video_res)
+                videos = data.get("videos", [])
 
                 for item in videos:
                     if not isinstance(item, dict):
@@ -794,9 +767,7 @@ async def fetch_serper_resources(
                     })
 
         except Exception as e:
-            logger.error(
-                f"VIDEO SEARCH ERROR: {str(e)}"
-            )
+            logger.error(f"VIDEO SEARCH ERROR: {str(e)}")
 
     return {
         "links": discovered_links,
@@ -861,7 +832,7 @@ async def sync_search_cache(
         )
 
 # ============================================================
-# TASK GENERATION ENDPOINT
+# TASK GENERATION ENDPOINT (WITH DEEP SCRUBBING ENGINE)
 # ============================================================
 
 @app.post("/generate-tasks")
@@ -889,6 +860,32 @@ async def generate_tasks(req: TaskRequest):
                 )
             )
 
+        # =================================================
+        # PLATFORM-WIDE TITLE SANITIZATION SWEEP
+        # =================================================
+        if "title" in task and isinstance(task["title"], str):
+            raw_title = task["title"]
+            user_name = req.user_name
+
+            # Level 1: Wipe exact case-insensitive username strings + common dividers
+            if user_name.lower() in raw_title.lower():
+                raw_title = re.sub(
+                    rf"{re.escape(user_name)}\s*[:\-\|]*\s*", 
+                    "", 
+                    raw_title, 
+                    flags=re.IGNORECASE
+                )
+            
+            # Level 2: Strict colon partition purge to clear lingering role prefixes
+            if ":" in raw_title:
+                raw_title = raw_title.split(":")[-1]
+
+            # Lock the sanitized pure subject back into the platform task payload
+            task["title"] = raw_title.strip()
+
+        # =================================================
+        # RESOURCE ENRICHMENT ON CLEAN SUBJECT
+        # =================================================
         SERPER_API_KEY = os.getenv(
             "SERPER_API_KEY"
         )
@@ -915,9 +912,6 @@ async def generate_tasks(req: TaskRequest):
                 []
             )
 
-            # =================================================
-            # MERGE RESOURCE LINKS
-            # =================================================
             if discovered_links:
                 existing_resources = task.get(
                     "educational_resources",
@@ -950,9 +944,6 @@ async def generate_tasks(req: TaskRequest):
 
                 task["educational_resources"] = ",".join(deduped_links)
 
-            # =================================================
-            # CACHE SEARCH RESULTS
-            # =================================================
             if cache_results:
                 cache_query = f"{req.track} {task_title}"
                 await sync_search_cache(

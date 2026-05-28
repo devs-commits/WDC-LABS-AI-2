@@ -6,38 +6,35 @@ from app.utils.deadline_formatter import format_deadline_display
 # Load prompt from file
 PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "emem.txt"
 
-
 def get_system_prompt() -> str:
     """Load Emem's system prompt from file."""
     with open(PROMPT_PATH, "r", encoding="utf-8") as f:
         return f.read()
 
-from typing import Optional
-
 def respond(message: str, context: Optional[dict] = None) -> str:
     """Simple response placeholder for Emem."""
     return "Emem response placeholder"
 
-def expectation_by_level(level: str) -> str:
-    if level == "Level 0":
-        return (
-            "This intern is still ramping up. Be explicit about what is required. "
-            "Do not assume prior experience. Set clear, achievable expectations."
-        )
+def expectation_by_identity(identity: str) -> str:
+    """Dynamic expectations based on 24-week gamified identity."""
+    senior_roles = ["Strategist", "Director", "Commander", "Chief", "Manager", "Expert", "Lead"]
+    mid_roles = ["Analyst", "Associate", "Marketer", "Defender", "Operator"]
 
-    if level == "Level 2":
+    if any(role in identity for role in senior_roles):
         return (
-            "This intern has demonstrated strong capability. "
-            "Expect ownership, initiative, and minimal hand-holding."
+            "This user is at the Executive/Senior level. Expect flawless execution, "
+            "strategic thinking, and zero hand-holding. Be extremely demanding."
         )
-
-    # Default: Level 1
+    elif any(role in identity for role in mid_roles):
+        return (
+            "This user is at the Intermediate level. Expect solid professional competence "
+            "and independence. They should not be making rookie mistakes."
+        )
+    
     return (
-        "This intern has some experience but may still need guidance. "
-        "Set standard intern expectations and monitor progress."
+        "This user is at the Intern/Foundational level. They are still ramping up. "
+        "Be explicit about what is required and monitor progress strictly."
     )
-
-
 
 async def assign_task(
     task_title: str,
@@ -69,7 +66,6 @@ Be direct and set clear expectations.
     response = await model.generate_content_async(prompt)
     return response.text
 
-
 async def respond_to_message(
     message: str,
     context: dict,
@@ -79,12 +75,9 @@ async def respond_to_message(
     """
     Respond to a deadline/task-related message as Emem.
     """
-
-    # Intern background context (derived from CV by another agent)
     bio_summary = context.get("bio_summary")
-    user_level = context.get("user_level", "Unknown")
-    user_level = context.get("user_level", "Level 1")
-    expectation_guidance = expectation_by_level(user_level)
+    current_identity = context.get("current_identity", "Intern")
+    expectation_guidance = expectation_by_identity(current_identity)
 
     system_prompt = get_system_prompt()
 
@@ -104,11 +97,10 @@ async def respond_to_message(
 ---
 
 **INTERN PROFILE (FOR CONTEXT ONLY):**
-Level: {user_level}
+Current Identity/Rank: {current_identity}
 Background Summary: {bio_summary or "No background summary available."}
 
 **INTERN CONTEXT (DO NOT MENTION DIRECTLY):**
-Intern Level: {user_level}
 Expectation Guidance: {expectation_guidance}
 
 **WORK CONTEXT:**
@@ -123,14 +115,13 @@ Deadline: {deadline}
 
 Respond as Emem.
 - Be brief and directive
-- Set expectations appropriate to the intern's level
+- Set expectations appropriate to the intern's current rank/identity
 - Reference their background only when it helps clarify expectations
 - Do NOT teach or explain how to do the task
 """
 
     response = await model.generate_content_async(prompt)
     return response.text
-
 
 async def generate_client_interruption(
     current_task: str,
@@ -139,12 +130,6 @@ async def generate_client_interruption(
 ) -> str:
     """
     Generate a realistic client interruption message to add chaos.
-
-    interruption_type:
-    - 'scope_change'
-    - 'constraint_added'
-    - 'urgent_pivot'
-    - 'data_correction'
     """
     system_prompt = get_system_prompt()
 
@@ -175,7 +160,7 @@ This should feel like real workplace chaos — frustrating but professional.
 async def generate_video_brief_script(
     task_title: str,
     task_brief: str,
-    model
+    model: genai.GenerativeModel
 ) -> str:
     prompt = f"""
         You are Emem, a Nigerian project manager.

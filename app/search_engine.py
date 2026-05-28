@@ -8,10 +8,11 @@ load_dotenv()
 
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 
-def serper_search_links(query: str, num_results: int = 5) -> List[Dict[str, Any]]:
+def serper_search_links(query: str, num_results: int = 2) -> List[Dict[str, Any]]:
     """
     Perform a Serper.dev search and return structured search results
     including title, url, and snippet.
+    Strictly capped to a maximum of 2 results to enforce resource constraints.
     """
 
     url = "https://google.serper.dev/search"
@@ -19,7 +20,8 @@ def serper_search_links(query: str, num_results: int = 5) -> List[Dict[str, Any]
         "X-API-KEY": SERPER_API_KEY,
         "Content-Type": "application/json"
     }
-    payload = {"q": query}
+    # Requesting 4 internally to ensure we get enough valid links before slicing to num_results
+    payload = {"q": query, "num": 4}
 
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=10)

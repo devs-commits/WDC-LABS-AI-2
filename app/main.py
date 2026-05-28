@@ -621,7 +621,7 @@ class TaskRequest(BaseModel):
     include_video_brief: Optional[bool] = True
 
 # ============================================================
-# SERPER RESOURCE ENRICHMENT
+# SERPER RESOURCE ENRICHMENT (UPDATED FOR 3 VIDEOS / 2 DOCS)
 # ============================================================
 
 async def fetch_serper_resources(
@@ -641,130 +641,96 @@ async def fetch_serper_resources(
     pruned_title = prune_task_title(task_title)
     logger.info(f"SEARCH QUERY TITLE: {pruned_title}")
 
-    async with httpx.AsyncClient(
-        timeout=10.0
-    ) as client:
+    async with httpx.AsyncClient(timeout=10.0) as client:
 
         # ====================================================
-        # DOCUMENTATION / PDF SWEEP
+        # DOCUMENTATION / PDF SWEEP (STRICT LIMIT: 2)
         # ====================================================
         try:
-            web_query = (
-                f"{track} "
-                f"{pruned_title} "
-                f"tutorial guide filetype:pdf"
-            )
+            web_query = f"{track} {pruned_title} tutorial guide filetype:pdf"
             web_res = await client.post(
                 "https://google.serper.dev/search",
                 headers=headers,
-                json={
-                    "q": web_query,
-                    "num": 4
-                }
+                json={"q": web_query, "num": 5} # Fetch 5 to ensure we get 2 good ones
             )
 
+            organic = []
             if web_res.status_code == 200:
                 data = safe_json_response(web_res)
                 organic = data.get("organic", [])
 
                 if not organic:
-                    fallback_query = (
-                        f"{track} "
-                        f"{pruned_title} "
-                        f"tutorial guide documentation"
-                    )
+                    fallback_query = f"{track} {pruned_title} tutorial guide documentation"
                     web_res = await client.post(
                         "https://google.serper.dev/search",
                         headers=headers,
-                        json={
-                            "q": fallback_query,
-                            "num": 4
-                        }
+                        json={"q": fallback_query, "num": 5}
                     )
                     data = safe_json_response(web_res)
                     organic = data.get("organic", [])
 
+                # ENFORCE STRICT 2 DOCUMENT LIMIT
+                doc_count = 0
                 for item in organic:
-                    if not isinstance(item, dict):
-                        continue
-
+                    if doc_count >= 2:
+                        break
+                        
+                    if not isinstance(item, dict): continue
                     link = item.get("link")
-                    if not link:
-                        continue
+                    if not link: continue
 
                     discovered_links.append(link)
-                    is_pdf = (
-                        link.lower().endswith(".pdf")
-                        or "pdf" in item.get("title", "").lower()
-                    )
+                    is_pdf = link.lower().endswith(".pdf") or "pdf" in item.get("title", "").lower()
 
                     cache_results.append({
-                        "title": item.get(
-                            "title",
-                            f"Documentation: {task_title}"
-                        ),
+                        "title": item.get("title", f"Documentation: {task_title}"),
                         "link": link,
                         "url": link,
-                        "snippet": item.get(
-                            "snippet",
-                            "Official reference material."
-                        ),
+                        "snippet": item.get("snippet", "Official reference material."),
                         "type": "pdf" if is_pdf else "web",
-                        "category": "Reference Links"
+                        "category": "Document Resources"
                     })
+                    doc_count += 1
 
         except Exception as e:
             logger.error(f"DOCUMENT SEARCH ERROR: {str(e)}")
 
         # ====================================================
-        # VIDEO SWEEP
+        # VIDEO SWEEP (STRICT LIMIT: 3)
         # ====================================================
         try:
-            video_query = (
-                f"{track} "
-                f"{pruned_title} "
-                f"tutorial video"
-            )
+            video_query = f"{track} {pruned_title} tutorial video"
             video_res = await client.post(
                 "https://google.serper.dev/videos",
                 headers=headers,
-                json={
-                    "q": video_query,
-                    "num": 3
-                }
+                json={"q": video_query, "num": 5} # Fetch a bit extra, filter to 3
             )
 
             if video_res.status_code == 200:
                 data = safe_json_response(video_res)
                 videos = data.get("videos", [])
 
+                # ENFORCE STRICT 3 VIDEO LIMIT
+                video_count = 0
                 for item in videos:
-                    if not isinstance(item, dict):
-                        continue
-
+                    if video_count >= 3:
+                        break
+                        
+                    if not isinstance(item, dict): continue
                     link = item.get("link")
-                    if not link:
-                        continue
+                    if not link: continue
 
                     discovered_links.append(link)
 
                     cache_results.append({
-                        "title": item.get(
-                            "title",
-                            (
-                                f"Video Tutorial: "
-                                f"{task_title}"
-                            )
-                        ),
+                        "title": item.get("title", f"Video Tutorial: {task_title}"),
                         "link": link,
                         "url": link,
-                        "snippet": item.get(
-                            "snippet",
-                            "Hands-on video guidance."
-                        ),
+                        "snippet": item.get("snippet", "Hands-on video guidance."),
                         "type": "video",
                         "category": "Video Resources"
                     })
+                    video_count += 1
 
         except Exception as e:
             logger.error(f"VIDEO SEARCH ERROR: {str(e)}")

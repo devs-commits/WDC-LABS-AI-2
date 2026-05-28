@@ -6,19 +6,14 @@ import json
 # Load prompt from file
 PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "kemi.txt"
 
-
 def get_system_prompt() -> str:
     """Load Kemi's system prompt from file."""
     with open(PROMPT_PATH, "r", encoding="utf-8") as f:
         return f.read()
 
-
-from typing import Optional
-
 def respond(message: str, context: Optional[dict] = None) -> str:
     """Simple response placeholder for Kemi."""
     return "Kemi response placeholder"
-
 
 async def translate_to_cv_bullet(
     task_title: str,
@@ -28,9 +23,6 @@ async def translate_to_cv_bullet(
 ) -> dict:
     """
     Translate a completed task into a professional CV bullet point.
-    
-    Returns:
-        dict with skill_tag and bullet_point
     """
     system_prompt = get_system_prompt()
     
@@ -74,7 +66,6 @@ Respond with JSON:
             "bullet_point": f"Successfully completed: {task_title}"
         }
 
-
 async def respond_to_message(
     message: str,
     context: dict,
@@ -92,7 +83,8 @@ async def respond_to_message(
         content = msg.get("content", "")
         history_text += f"{role.upper()}: {content}\n"
     
-    user_level = context.get("user_level", "Unknown")
+    current_identity = context.get("current_identity", "Intern")
+    unlocked_badges = context.get("unlocked_badges", [])
     track = context.get("track", "Unknown")
     
     prompt = f"""
@@ -101,7 +93,8 @@ async def respond_to_message(
 ---
 
 **CONTEXT:**
-User Level: {user_level}
+Current Identity/Rank: {current_identity}
+Unlocked Badges: {unlocked_badges}
 Track: {track}
 
 **RECENT CHAT:**
@@ -112,12 +105,11 @@ Track: {track}
 
 Respond as Coach Kemi. Be warm, encouraging, and focus on their growth.
 If they're struggling, help them see the bigger picture.
-If they're celebrating, celebrate with them and remind them of their progress.
+If they're celebrating, celebrate with them and remind them of their progress and badges.
 """
 
     response = await model.generate_content_async(prompt)
     return response.text
-
 
 async def provide_soft_skills_feedback(
     recent_interactions: List[dict],
@@ -154,7 +146,6 @@ Frame it positively - acknowledge what they're doing well, then suggest improvem
     response = await model.generate_content_async(prompt)
     return response.text
 
-
 async def conduct_mock_interview(
     interview_type: str,
     question_number: int,
@@ -164,15 +155,10 @@ async def conduct_mock_interview(
 ) -> dict:
     """
     Conduct a realistic mock interview.
-    Kemi must stay in interviewer mode until the interview ends.
     """
-
     system_prompt = get_system_prompt()
-
-    # Define interview length
     TOTAL_QUESTIONS = 5
 
-    # Interviewer behavior rules
     interviewer_rules = """
 You are acting as a real interviewer.
 
@@ -184,7 +170,6 @@ Rules:
 - Slight pressure is acceptable
 """
 
-    # Final feedback mode
     if question_number > TOTAL_QUESTIONS:
         feedback_prompt = f"""
 {system_prompt}
@@ -199,14 +184,12 @@ Based on the candidate’s answers, provide:
 
 Be honest. No encouragement fluff.
 """
-
         response = await model.generate_content_async(feedback_prompt)
         return {
             "stage": "feedback",
             "content": response.text
         }
 
-    # Normal interview question
     interview_prompt = f"""
 {system_prompt}
 
@@ -237,11 +220,13 @@ Respond with JSON:
     
     try:
         text = response.text.strip()
-        if text.startswith("```json"):
+        if text.startswith("
+```json"):
             text = text[7:]
         if text.startswith("```"):
             text = text[3:]
-        if text.endswith("```"):
+        if text.endswith("
+```"):
             text = text[:-3]
         
         data = json.loads(text.strip())
@@ -254,7 +239,6 @@ Respond with JSON:
             "evaluation": data.get("evaluation", "")
         }
     except json.JSONDecodeError:
-        # Fallback
         return {
             "stage": "question",
             "question_number": question_number,

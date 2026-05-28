@@ -96,8 +96,11 @@ Kemi
 
         # AI-POWERED CATEGORY DETECTION
         try:
+            # --- UPDATED: Injected 24-week gamification context to the router ---
             context_info = f"""
 User Level: {context.user_level or 'Unknown'}
+Current Identity/Rank: {context.current_identity or 'Intern'}
+Current Week: {context.current_week or 'Unknown'}
 Track: {context.track or 'Unknown'}
 Active Task: {context.task_brief or 'None'}
 """
@@ -178,6 +181,7 @@ Detect the appropriate agent category and respond with ONLY the agent name.
         chat_history = chat_history or []
         agent = await self.determine_agent(message, context)
 
+        # --- UPDATED: Passing the Gamified Context payload to Agents ---
         ctx = {
             "user_level": context.user_level,
             "track": context.track,
@@ -186,6 +190,9 @@ Detect the appropriate agent category and respond with ONLY the agent name.
             "task_id": context.task_id,
             "cv_text": context.cv_text,
             "bio_summary": context.bio_summary,
+            "current_identity": context.current_identity,
+            "unlocked_badges": context.unlocked_badges,
+            "current_week": context.current_week,
         }
 
         if agent == AgentName.TOLU:
@@ -201,11 +208,13 @@ Detect the appropriate agent category and respond with ONLY the agent name.
             text = await kemi.respond_to_message(message, ctx, chat_history, self.model)
 
         elif agent == AgentName.RECOMMENDER:
+            # Defaults to 12 weeks if not explicitly provided
+            duration = getattr(context, "internship_duration_weeks", 12)
             result = await recommender.generate_letter(
                 cv_text=context.cv_text or "",
-                internship_duration_weeks=context.internship_duration_weeks or 12,
+                internship_duration_weeks=duration,
                 track=context.track or "Unknown",
-                performance_summary=context.performance_summary,
+                performance_summary=context.bio_summary, # or performance_summary if mapped
                 model=self.model
             )
             text = result.get("letter_text", "")
@@ -232,16 +241,20 @@ Detect the appropriate agent category and respond with ONLY the agent name.
         task_brief: str,
         submission_content: str,
         client_constraints: Optional[str] = None,
-        attempt_number: int = 1 # <--- CAPTURE ATTEMPT NUMBER
+        attempt_number: int = 1,
+        current_identity: str = "Intern",           # <--- ADDED: Passes Identity to Sola
+        badge_opportunity: Optional[str] = None     # <--- ADDED: Passes Badge Goal to Sola
     ) -> dict:
 
         review = await sola.review_submission(
-            task_title,
-            task_brief,
-            submission_content,
-            client_constraints,
-            self.model,
-            attempt_number      # <--- PASS TO SOLA
+            task_title=task_title,
+            task_brief=task_brief,
+            submission_content=submission_content,
+            client_constraints=client_constraints,
+            model=self.model,
+            attempt_number=attempt_number,
+            current_identity=current_identity,       # <--- PASSED DOWN
+            badge_opportunity=badge_opportunity      # <--- PASSED DOWN
         )
 
         # Sola 2.0 Multimedia Remediation Payload Extraction

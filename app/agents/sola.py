@@ -33,16 +33,18 @@ async def review_submission(
     submission_content: str,
     client_constraints: Optional[str],
     model: genai.GenerativeModel,
-    attempt_number: int = 1  # <--- Added attempt tracking
+    attempt_number: int = 1,
+    current_identity: str = "Intern",
+    badge_opportunity: Optional[str] = None
 ) -> dict:
     """
     Review a user's submission as Sola (Technical Lead).
-    Implements the 3-Strike Rule and Final Evaluation Mode.
+    Implements the 3-Strike Rule, Final Evaluation Mode, and Badge evaluation.
     """
     system_prompt = get_system_prompt()
     
-    # Truncate very long submissions to avoid token limits
-    submission_preview = submission_content[:3000] if len(submission_content) > 3000 else submission_content
+    # Expand truncation drastically for Gemini 1.5 Pro to ingest full documents
+    submission_preview = submission_content[:15000] if len(submission_content) > 15000 else submission_content
     
     # --- 3-TRIAL LIMIT LOGIC ---
     if attempt_number >= 3:
@@ -51,43 +53,20 @@ async def review_submission(
         Stop iterative coaching. Conduct a full end-to-end assessment of the learner’s submission.
         Identify and present ALL remaining issues, weaknesses, inconsistencies, and missing requirements in a single response.
         Do not withhold additional feedback for future revisions.
-        Evaluate strictly according to the assignment brief and evidence presented.
-        Shift from iterative coaching to comprehensive final assessment.
-        
-        The 'feedback' string MUST follow this EXACT format using Markdown headers:
-        
-        ### 1. Overall Evaluation
-        [Concise summary of overall quality]
-        
-        ### 2. Strengths
-        [What was done correctly and effectively]
-        
-        ### 3. Weaknesses
-        [All remaining analytical, structural, factual, or methodological issues]
-        
-        ### 4. Missing, Unsupported, or Incorrect Requirements
-        [Explicitly identify missing requirements, unsupported assumptions, or deviations]
-        
-        ### 5. Recommendations for Improvement
-        [Actionable suggestions for professional growth]
-        
-        ### 6. Final Score
-        [Score out of 100%]
         
         Respond ONLY with valid JSON on a single line (no markdown blocks around the JSON):
-        {"feedback": "Formatted final evaluation report matching the required structure above", "passed": true_or_false, "score": integer_0_to_100, "improvement_points": ["Point 1", "Point 2"]}
+        {"feedback": "Formatted final evaluation report matching the required structure", "passed": true_or_false, "score": integer_0_to_100, "error_tag": "[ERR_GENERAL]"}
         """
     else:
         evaluation_rules = f"""
         ITERATIVE COACHING MODE (Attempt {attempt_number} of 3).
-        1. Check if submission addresses the task requirements.
-        2. Check code/analytical quality and professionalism.
-        3. Check if client constraints were followed.
-        4. Apply the 60% Rejection Rule - reject unless truly excellent.
-        5. Focus on major blockers; do not reveal every single micro-flaw if they are overwhelming. Save detailed grading for Attempt 3.
+        1. Evaluate based on their rank: {current_identity}. Hold higher ranks to a flawless standard.
+        2. Check if submission addresses the task requirements and client constraints.
+        3. Check code/analytical quality and professionalism.
+        4. Focus on major blockers; structure feedback exactly as: Positive, Pivot, Why, Badge Verdict, Tag, Encouragement.
         
         Respond ONLY with valid JSON on a single line (no markdown blocks around the JSON):
-        {{"feedback": "Your detailed coaching message", "passed": true_or_false, "score": integer_0_to_100, "improvement_points": ["Point 1"]}}
+        {{"feedback": "Your detailed 6-part coaching message", "passed": true_or_false, "score": integer_0_to_100, "error_tag": "[ERR_TAG]"}}
         """
 
     prompt = f"""
@@ -100,6 +79,8 @@ Title: {task_title}
 Brief: {task_brief}
 Client Constraints: {client_constraints or "None specified"}
 Attempt Number: {attempt_number}/3
+Current Identity: {current_identity}
+Badge Opportunity: {badge_opportunity or "None"}
 
 **USER'S SUBMISSION:**
 \"\"\"
@@ -119,7 +100,8 @@ Attempt Number: {attempt_number}/3
             lines = text.split('\n')
             if len(lines) > 1:
                 text = '\n'.join(lines[1:])
-                if text.endswith("```"):
+                if text.endswith("
+```"):
                     text = text[:-3]
         
         import re
@@ -147,7 +129,7 @@ Attempt Number: {attempt_number}/3
         "feedback": "Unable to generate review due to a system error. Please resubmit your work.",
         "passed": False,
         "score": 0,
-        "improvement_points": ["System parsing error occurred"]
+        "error_tag": "[ERR_SYSTEM]"
     }
 
 
@@ -169,6 +151,7 @@ async def respond_to_message(
         history_text += f"{role.upper()}: {content}\n"
     
     current_task = context.get("task_brief", "No active task")
+    current_identity = context.get("current_identity", "Intern")
     
     prompt = f"""
 {system_prompt}
@@ -177,6 +160,7 @@ async def respond_to_message(
 
 **CONTEXT:**
 Current Task: {current_task}
+Current Identity: {current_identity}
 
 **RECENT CHAT:**
 {history_text}

@@ -2,14 +2,12 @@ from pydantic import BaseModel
 from typing import Optional, List, Literal, Dict, Any
 from enum import Enum
 
-
 class AgentName(str, Enum):
     TOLU = "Tolu"
     EMEM = "Emem"
     SOLA = "Sola"
     KEMI = "Kemi"
     RECOMMENDER = "Recommender"
-
 
 class UserLevel(str, Enum):
     LEVEL_0 = "Level 0"
@@ -18,7 +16,6 @@ class UserLevel(str, Enum):
     BEGINNER = "Beginner"
     INTERMEDIATE = "Intermediate"
     ADVANCED = "Advanced"
-
 
 # Chat Request/Response
 class ChatContext(BaseModel):
@@ -31,6 +28,9 @@ class ChatContext(BaseModel):
     deadline: Optional[str] = None
     cv_text: Optional[str] = None
     bio_summary: Optional[str] = None
+    current_identity: Optional[str] = None
+    unlocked_badges: Optional[List[str]] = []
+    current_week: Optional[int] = None
 
 class ChatRequest(BaseModel):
     user_id: str
@@ -38,12 +38,10 @@ class ChatRequest(BaseModel):
     context: ChatContext = ChatContext()
     chat_history: Optional[List[dict]] = []
 
-
 class ChatResponse(BaseModel):
     agent: AgentName
     message: str
     metadata: Optional[dict] = None
-
 
 # Bio/Resume Assessment
 class BioAssessmentRequest(BaseModel):
@@ -53,13 +51,11 @@ class BioAssessmentRequest(BaseModel):
     cv_url: Optional[str] = None  # URL of uploaded CV from storage
     track: str
 
-
 class BioAssessmentResponse(BaseModel):
     response_text: str
     assessed_level: UserLevel
     reasoning: str
     warmup_mode: bool = False
-
 
 # Task Generation
 class TaskGenerationRequest(BaseModel):
@@ -71,12 +67,10 @@ class TaskGenerationRequest(BaseModel):
     user_city: Optional[str] = None
     user_country: Optional[str] = None
 
-
 class TaskResource(BaseModel):
     title: str
     description: str
     content: Optional[str] = None  # Markdown content, generated lazily or upfront
-
 
 class VideoBrief(BaseModel):
     agent: str
@@ -87,7 +81,6 @@ class VideoBrief(BaseModel):
     video_url: Optional[str] = None
     status: str
 
-
 class GeneratedTask(BaseModel):
     title: str
     brief_content: str
@@ -96,6 +89,8 @@ class GeneratedTask(BaseModel):
     deadline: str
     deadline_display: str
     experience_level: str
+    current_identity: Optional[str] = None
+    badge_opportunity: Optional[str] = None
     attachments: Optional[List[str]] = []
     ai_persona_config: Optional[dict] = None
     metadata: dict
@@ -104,10 +99,8 @@ class GeneratedTask(BaseModel):
     has_ethical_trap: bool = False
     ethical_trap: Optional[dict] = None
 
-
 class TaskGenerationResponse(BaseModel):
     tasks: List[GeneratedTask]
-
 
 # --- SOLA 2.0 MULTIMEDIA REMEDIATION ---
 class LearningAsset(BaseModel):
@@ -115,7 +108,6 @@ class LearningAsset(BaseModel):
     asset_type: str
     url: str
     title: str
-
 
 # Work Submission Review
 class SubmissionReviewRequest(BaseModel):
@@ -126,8 +118,7 @@ class SubmissionReviewRequest(BaseModel):
     task_title: str
     task_brief: str
     chat_history: Optional[List[dict]] = []
-    attempt_number: int = 1  # <--- ADDED: Tracks submission attempts
-
+    attempt_number: int = 1  
 
 class SubmissionReviewResponse(BaseModel):
     agent: Literal["Sola"] = "Sola"
@@ -139,8 +130,7 @@ class SubmissionReviewResponse(BaseModel):
     technical_accuracy: Optional[int] = None
     reliability_speed: Optional[int] = None
     communication_score: Optional[int] = None
-    portfolio_bullet: Optional[str] = None  # Kemi's CV translation if passed
-
+    portfolio_bullet: Optional[str] = None  
 
 # Portfolio Generation
 class PortfolioBulletRequest(BaseModel):
@@ -148,11 +138,9 @@ class PortfolioBulletRequest(BaseModel):
     task_description: str
     user_submission: str
 
-
 class PortfolioBulletResponse(BaseModel):
     skill_tag: str
     bullet_point: str
-
 
 # Mock Interview
 class MockInterviewRequest(BaseModel):
@@ -160,7 +148,6 @@ class MockInterviewRequest(BaseModel):
     interview_subtype: Optional[str] = None 
     question_number: int
     previous_answer: Optional[str] = None
-
 
 class MockInterviewResponse(BaseModel):
     stage: Literal["question", "feedback"]
@@ -170,7 +157,6 @@ class MockInterviewResponse(BaseModel):
     tip: Optional[str] = None
     evaluation: Optional[str] = None
 
-
 # Onboarding Team Introduction
 class OnboardingIntroRequest(BaseModel):
     user_id: str
@@ -179,16 +165,13 @@ class OnboardingIntroRequest(BaseModel):
     user_level: Optional[str] = None
     bio_summary: Optional[str] = None  
 
-
 class OnboardingIntroMessage(BaseModel):
     agent: AgentName
     message: str
     typing_delay_ms: int  
 
-
 class OnboardingIntroResponse(BaseModel):
     messages: List[OnboardingIntroMessage]
-
 
 # Resource Generation
 class ResourceGenerationRequest(BaseModel):
@@ -197,12 +180,10 @@ class ResourceGenerationRequest(BaseModel):
     task_context: Optional[str] = None  
     user_level: Optional[str] = None
 
-
 class ResourceGenerationResponse(BaseModel):
     title: str
     category: str
     content: str  
-
 
 class RecommendationLetterRequest(BaseModel):
     user_id: str
@@ -211,12 +192,10 @@ class RecommendationLetterRequest(BaseModel):
     internship_duration_weeks: Literal[12, 24]
     performance_summary: Optional[str] = None
 
-
 class RecommendationLetterResponse(BaseModel):
     letter_text: str
     tone: str
     duration_weeks: int
-
 
 class OrchestratorInput(BaseModel):
     message: str
@@ -225,7 +204,6 @@ class OrchestratorInput(BaseModel):
     user_region: str = "NG"
     user_level: int = 0
     user_track: Optional[str] = None
-
 
 class OrchestratorResponse(BaseModel):
     agent: str

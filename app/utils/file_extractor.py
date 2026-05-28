@@ -1,5 +1,6 @@
 """
 File extraction utility - handles multiple file formats
+Upgraded for large dataset safety and Excel structure preservation.
 """
 
 import io
@@ -27,6 +28,9 @@ def extract_text_from_file(file_url: str, file_content_bytes: bytes, mime_type: 
     Extract text from various file formats.
     Supports: PDF, DOCX, XLSX, PPTX, CSV, TXT, JSON, Images
     """
+    if not file_content_bytes:
+        return "[Error: Empty file received from server]"
+
     try:
         # 1. Clean the URL to get the TRUE extension (removes ?tokens=123)
         clean_url = urllib.parse.urlparse(file_url).path if file_url else ""
@@ -35,17 +39,25 @@ def extract_text_from_file(file_url: str, file_content_bytes: bytes, mime_type: 
         # 2. Make mime_type safe
         mime = (mime_type or "").lower()
 
+        # --- ROUTING LOGIC ---
+
         # PDF files
         if file_ext == "pdf" or "pdf" in mime:
             return extract_pdf(file_content_bytes)
         
+        # Excel files (.xlsx, .xls)
+        elif file_ext in ["xlsx", "xls"] or "sheet" in mime or "excel" in mime:
+            result = extract_excel(file_content_bytes)
+            # Failsafe: If it failed because it's secretly a CSV disguised as an Excel file
+            if "extraction error" in result:
+                csv_fallback = extract_csv(file_content_bytes)
+                if "error" not in csv_fallback:
+                    return csv_fallback
+            return result
+        
         # Word documents (.docx)
         elif file_ext in ["docx", "doc"] or "word" in mime or "document" in mime:
             return extract_docx(file_content_bytes)
-        
-        # Excel files (.xlsx, .xls)
-        elif file_ext in ["xlsx", "xls"] or "sheet" in mime or "excel" in mime:
-            return extract_excel(file_content_bytes)
         
         # PowerPoint files (.pptx)
         elif file_ext == "pptx" or "presentation" in mime:
@@ -63,13 +75,21 @@ def extract_text_from_file(file_url: str, file_content_bytes: bytes, mime_type: 
         elif file_ext in ["txt", "md", "py", "js", "html", "css", "sql"] or "text" in mime:
             return process_text_file(file_content_bytes, file_ext)
         
-        # FALLBACK 1: If it's an unrecognized Excel/Word zip file, don't read as raw text
+        # --- MAGIC BYTE FALLBACKS FOR UNRECOGNIZED EXTENSIONS ---
+        
         # 'PK' is the magic byte signature for all OpenXML (xlsx, docx) files
         elif file_content_bytes.startswith(b'PK\x03\x04'): 
+            # Try Excel first (most common for Data Analytics track)
             excel_text = extract_excel(file_content_bytes)
-            if "Excel extraction error" not in excel_text and "[Excel support not installed" not in excel_text:
+            if "Excel extraction error" not in excel_text and "support not installed" not in excel_text:
                 return excel_text
-            return extract_docx(file_content_bytes)
+            
+            # Try Word second
+            docx_text = extract_docx(file_content_bytes)
+            if "DOCX extraction error" not in docx_text:
+                return docx_text
+                
+            return "[Error: Unrecognized OpenXML format. Could not parse as Excel or Word.]"
         
         # FALLBACK 2: Absolute Default try UTF-8 decode
         else:
@@ -83,7 +103,7 @@ def process_text_file(file_bytes: bytes, file_ext: str) -> str:
     """Helper to process plain text and code files"""
     try:
         raw_text = file_bytes.decode("utf-8", errors="ignore")
-        # Inject line numbers for code files so agents can reference them
+        # Inject line numbers for code files so agents can easily point out errors
         if file_ext in ["py", "js", "html", "css", "sql"]:
             lines = raw_text.split('\n')
             numbered_lines = [f"[Line {i+1}] {line}" for i, line in enumerate(lines)]
@@ -126,23 +146,43 @@ def extract_docx(file_bytes: bytes) -> str:
 
 
 def extract_excel(file_bytes: bytes) -> str:
-    """Extract full text from Excel file (.xlsx/.xls)"""
+    """Extract text from Excel file with strict limits to prevent AI hallucination"""
     if not EXCEL_SUPPORT:
-        return "[Excel support not installed - please inform the system administrator to install openpyxl]"
+        return "[Excel extraction error: openpyxl library is not installed on the server.]"
     
     try:
         # data_only=True ensures we get calculated values, not the raw formula strings
         workbook = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
         text = ""
+        
         for sheet_name in workbook.sheetnames: 
             worksheet = workbook[sheet_name]
             text += f"\n--- Sheet: {sheet_name} ---\n"
+            
+            row_count = 0
             for row in worksheet.iter_rows(values_only=True): 
-                row_text = " | ".join(str(cell) if cell is not None else "" for cell in row)
-                if row_text.strip().replace(" | ", ""): # Only add if row is not completely empty
+                # Convert to string and handle None types. Strip newlines inside cells to prevent layout breaking.
+                row_text = " | ".join(str(cell).replace('\n', ' ').replace('\r', '').strip() if cell is not None else "" for cell in row)
+                
+                # Only add if row is not completely empty
+                if row_text.replace(" | ", "").strip(): 
                     text += row_text + "\n"
+                    row_count += 1
+                
+                # Hard limit to 1500 rows to prevent blowing out the LLM's context memory!
+                if row_count >= 1500:
+                    text += "\n[... TRUNCATED: Exceeded 1500 rows to prevent system memory overload ...]\n"
+                    break
+                    
+        if not text.strip():
+            return "[Excel file appears to be completely empty]"
+            
         return text
+        
     except Exception as e:
+        error_msg = str(e).lower()
+        if "does not support the old .xls" in error_msg or "invalid file" in error_msg:
+            return "[Excel extraction error: This appears to be an older .xls file or an unsupported format. Please convert it to .xlsx or .csv and try again.]"
         return f"[Excel extraction error: {str(e)}]"
 
 
@@ -169,8 +209,15 @@ def extract_csv(file_bytes: bytes) -> str:
         text_content = file_bytes.decode("utf-8", errors="ignore")
         csv_reader = csv.reader(io.StringIO(text_content))
         text = ""
+        row_count = 0
+        
         for row in csv_reader:
             text += " | ".join(row) + "\n"
+            row_count += 1
+            if row_count >= 1500:
+                text += "\n[... TRUNCATED: Exceeded 1500 rows to prevent system memory overload ...]\n"
+                break
+                
         return text
     except Exception as e:
         return f"[CSV extraction error: {str(e)}]"

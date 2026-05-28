@@ -337,7 +337,11 @@ async def generate_task(
     return task_dict
 
 # --- Search Engine Helper ---
-def serper_search_links(query: str, num_results: int = 3):
+def serper_search_links(query: str, num_results: int = 2) -> List[Dict[str, str]]:
+    """
+    Fallback search engine helper. 
+    Hardcapped at returning max 2 results to stay within global resource limits.
+    """
     import os
     import requests
 
@@ -348,7 +352,6 @@ def serper_search_links(query: str, num_results: int = 3):
         return []
 
     url = "https://google.serper.dev/search"
-
     headers = {
         "X-API-KEY": api_key,
         "Content-Type": "application/json"
@@ -358,14 +361,14 @@ def serper_search_links(query: str, num_results: int = 3):
         response = requests.post(
             url,
             headers=headers,
-            json={"q": query},
+            json={"q": query, "num": 4}, # Request 4, slice later
             timeout=10
         )
-
         response.raise_for_status()
         data = response.json()
 
         results = []
+        # Strictly slice to num_results
         for item in data.get("organic", [])[:num_results]:
             results.append({
                 "type": "link",
@@ -375,7 +378,6 @@ def serper_search_links(query: str, num_results: int = 3):
             })
 
         return results
-
     except Exception as e:
         print("SERPER ERROR:", e)
         return []

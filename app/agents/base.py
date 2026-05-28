@@ -2,7 +2,6 @@ from pathlib import Path
 import google.generativeai as genai
 from typing import Optional
 
-
 class BaseAgent:
     def __init__(self, name: str, prompt_file: str, model_name: str = "gemini-1.5-pro"):
         self.name = name

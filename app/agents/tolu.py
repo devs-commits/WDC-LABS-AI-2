@@ -38,7 +38,7 @@ async def assess_bio(
 
 **TASK: INTERN BACKGROUND REVIEW**
 
-You are reviewing this intern’s submitted bio/resume as part of an intake process.
+You are reviewing this intern’s submitted bio/resume as part of an intake process for our 24-week program.
 You are experienced and realistic — not overly encouraging.
 
 Track: {track}
@@ -56,7 +56,7 @@ Assess the intern based on:
 
 Then respond in JSON with:
 
-1. A short, professional welcome (neutral tone, not hype)
+1. A short, professional welcome (neutral tone, not hype). Set expectations for the 24-week progression.
 2. Assessed level:
    - Level 0: New / theory-only / unclear exposure
    - Level 1: Some hands-on exposure, still inconsistent
@@ -82,7 +82,8 @@ Format strictly as JSON:
         # Strip markdown fences if present
         if text.startswith("```json"):
             text = text[7:]
-        if text.startswith("```"):
+        if text.startswith("
+```"):
             text = text[3:]
         if text.endswith("```"):
             text = text[:-3]
@@ -121,6 +122,8 @@ async def respond_to_message(
         content = msg.get("content", "")
         history_text += f"{role.upper()}: {content}\n"
 
+    current_identity = context.get('current_identity', 'Intern')
+
     prompt = f"""
 {system_prompt}
 
@@ -128,6 +131,7 @@ async def respond_to_message(
 
 **CONTEXT:**
 User Level: {context.get('user_level', 'Unknown')}
+Current Identity: {current_identity}
 Track: {context.get('track', 'Unknown')}
 
 **RECENT CHAT:**
@@ -139,6 +143,7 @@ Track: {context.get('track', 'Unknown')}
 Respond as Tolu.
 - Be professional
 - Be concise
+- Acknowledge their rank ({current_identity}) if applicable.
 - No coaching unless explicitly asked
 """
 

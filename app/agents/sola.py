@@ -100,10 +100,9 @@ Badge Opportunity: {badge_opportunity or "None"}
             lines = text.split('\n')
             if len(lines) > 1:
                 text = '\n'.join(lines[1:])
-                if text.endswith("
-```"):
+                if text.endswith("```"):
                     text = text[:-3]
-        
+
         import re
         json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
         

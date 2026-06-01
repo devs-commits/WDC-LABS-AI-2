@@ -89,7 +89,9 @@ async def respond_to_message(
         history_text += f"{role.upper()}: {content}\n"
 
     current_task = context.get("task_brief", "No active task")
-    deadline = context.get("deadline", "Not set")
+    
+    # --- THE FIX: Safely fallback to deadline_display to prevent "undefined" bugs ---
+    deadline = context.get("deadline_display", context.get("deadline", "the end of this week"))
 
     prompt = f"""
 {system_prompt}

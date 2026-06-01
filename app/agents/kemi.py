@@ -220,13 +220,13 @@ Respond with JSON:
     
     try:
         text = response.text.strip()
-        if text.startswith("
-```json"):
+        
+        # Strip markdown fences if present
+        if text.startswith("```json"):
             text = text[7:]
         if text.startswith("```"):
             text = text[3:]
-        if text.endswith("
-```"):
+        if text.endswith("```"):
             text = text[:-3]
         
         data = json.loads(text.strip())

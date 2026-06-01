@@ -2,6 +2,7 @@
 WDC Labs Curriculum Definitions.
 Maps specific task numbers in a track to learning objectives, topics, and gamification badges.
 """
+import datetime
 
 FRAMEWORK_DEFINITIONS = {
     "3i_principles": "Initiate, Iterate, Integrate"
@@ -14,7 +15,10 @@ FRAMEWORK_DEFINITIONS = {
 def get_identity_for_week(track: str, week: int) -> str:
     """Dynamically maps the user's week to their gamified job title."""
     
-    if track == "data_analytics":
+    # Normalize the track string to ensure it perfectly matches our dictionary
+    track_key = track.lower().replace(" ", "_").replace("-", "_")
+
+    if track_key == "data_analytics":
         if week <= 4: return "Data Intern"
         if week <= 8: return "Junior Data Analyst"
         if week <= 12: return "Data Analyst"
@@ -22,7 +26,7 @@ def get_identity_for_week(track: str, week: int) -> str:
         if week <= 20: return "Analytics Strategist"
         return "Director of Analytics"
 
-    elif track == "digital_marketing":
+    elif track_key == "digital_marketing":
         if week <= 4: return "Marketing Intern"
         if week <= 8: return "Campaign Operator"
         if week <= 12: return "Digital Marketing Associate"
@@ -30,7 +34,7 @@ def get_identity_for_week(track: str, week: int) -> str:
         if week <= 20: return "Growth Strategist"
         return "Marketing Director"
 
-    elif track == "cyber_security":
+    elif track_key == "cyber_security":
         if week <= 4: return "Security Intern"
         if week <= 8: return "Security Associate"
         if week <= 12: return "Security Analyst"
@@ -142,7 +146,7 @@ def get_curriculum_step(track: str, task_number: int):
     Retrieve the specific curriculum step for a given track and task number.
     Injects dynamic gamification identity based on the task_number (week).
     """
-    track_key = track.lower().replace(" ", "_")
+    track_key = track.lower().replace(" ", "_").replace("-", "_")
     track_curriculum = CURRICULUM.get(track_key, {})
     
     step_data = track_curriculum.get(task_number)
@@ -153,3 +157,48 @@ def get_curriculum_step(track: str, task_number: int):
         
     print(f"fetched curriculum step for {track_key} week {task_number}: -->", step_data)
     return step_data
+
+
+# ============================================================
+# PROGRESSION & BADGE ENGINE
+# ============================================================
+
+def process_task_completion(supabase_client, user_id, track: str, completed_week: int):
+    """
+    IMPORTANT: Do NOT call this inside emem.py. 
+    Call this function from your API Route or Orchestrator exactly where you run the code 
+    that marks the task as 'completed' in the database.
+    """
+    track_key = track.lower().replace(" ", "_").replace("-", "_")
+    
+    # 1. Calculate new identity
+    new_identity = get_identity_for_week(track_key, completed_week)
+    
+    # 2. Update user_progression table
+    progression_data = {
+        "user_id": user_id,
+        "current_week": completed_week,
+        "current_identity": new_identity,
+        "week_status": "passed_waiting",
+        "updated_at": datetime.datetime.utcnow().isoformat()
+    }
+    
+    supabase_client.table("user_progression").upsert(
+        progression_data
+    ).execute()
+    
+    # 3. Automatically award a badge if this week has one!
+    curriculum_step = CURRICULUM.get(track_key, {}).get(completed_week, {})
+    badge_to_award = curriculum_step.get("badge_opportunity")
+    
+    if badge_to_award:
+        badge_data = {
+            "user_id": user_id,
+            "badge_name": badge_to_award,
+            "earned_in_week": completed_week
+        }
+        try:
+            supabase_client.table("user_badges").insert(badge_data).execute()
+            print(f"🎉 Successfully awarded '{badge_to_award}' badge to user {user_id}!")
+        except Exception as e:
+            print(f"User {user_id} already has badge '{badge_to_award}' or an error occurred: {e}")

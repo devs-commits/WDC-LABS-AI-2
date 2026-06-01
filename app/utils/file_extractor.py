@@ -155,11 +155,13 @@ def extract_excel(file_bytes: bytes) -> str:
         workbook = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
         text = ""
         
+        # FIX 1: Move row_count OUTSIDE the sheet loop for a global file limit
+        global_row_count = 0
+        
         for sheet_name in workbook.sheetnames: 
             worksheet = workbook[sheet_name]
             text += f"\n--- Sheet: {sheet_name} ---\n"
             
-            row_count = 0
             for row in worksheet.iter_rows(values_only=True): 
                 # Convert to string and handle None types. Strip newlines inside cells to prevent layout breaking.
                 row_text = " | ".join(str(cell).replace('\n', ' ').replace('\r', '').strip() if cell is not None else "" for cell in row)
@@ -167,12 +169,12 @@ def extract_excel(file_bytes: bytes) -> str:
                 # Only add if row is not completely empty
                 if row_text.replace(" | ", "").strip(): 
                     text += row_text + "\n"
-                    row_count += 1
+                    global_row_count += 1
                 
                 # Hard limit to 1500 rows to prevent blowing out the LLM's context memory!
-                if row_count >= 1500:
-                    text += "\n[... TRUNCATED: Exceeded 1500 rows to prevent system memory overload ...]\n"
-                    break
+                if global_row_count >= 1500:
+                    text += "\n[... TRUNCATED: Exceeded 1500 total rows across all sheets to prevent memory overload ...]\n"
+                    return text # Immediately exit the entire function
                     
         if not text.strip():
             return "[Excel file appears to be completely empty]"
@@ -206,7 +208,12 @@ def extract_pptx(file_bytes: bytes) -> str:
 def extract_csv(file_bytes: bytes) -> str:
     """Extract full text from CSV file"""
     try:
-        text_content = file_bytes.decode("utf-8", errors="ignore")
+        # FIX 2: Try UTF-8 first, fallback to Windows-1252 (cp1252) to prevent dropping special chars
+        try:
+            text_content = file_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            text_content = file_bytes.decode("cp1252", errors="ignore")
+            
         csv_reader = csv.reader(io.StringIO(text_content))
         text = ""
         row_count = 0

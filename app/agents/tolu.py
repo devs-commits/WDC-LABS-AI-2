@@ -1,6 +1,6 @@
 import google.generativeai as genai
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 import json
 
 # Load prompt from file
@@ -12,7 +12,6 @@ def get_system_prompt() -> str:
     with open(PROMPT_PATH, "r", encoding="utf-8") as f:
         return f.read()
 
-from typing import Optional
 
 def respond(message: str, context: Optional[dict] = None):
     return "Tolu response placeholder"
@@ -82,9 +81,9 @@ Format strictly as JSON:
         # Strip markdown fences if present
         if text.startswith("```json"):
             text = text[7:]
-        if text.startswith("
-```"):
+        elif text.startswith("```"):
             text = text[3:]
+            
         if text.endswith("```"):
             text = text[:-3]
 

@@ -2,9 +2,9 @@
 WDC Labs AI Orchestrator
 The Central Brain that routes messages to the appropriate agent.
 """
+import re
 from typing import Optional, List
 import google.generativeai as genai
-import re
 
 from .schemas import AgentName, ChatContext, ChatResponse
 from .agents import tolu, emem, sola, kemi, recommender

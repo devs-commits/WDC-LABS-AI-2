@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Optional, List
 from app.archives.index import ARCHIVE_LIBRARY
 import json
+import re
 
 # Load prompt from file
 PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "sola.txt"
@@ -46,7 +47,25 @@ async def review_submission(
     # Expand truncation drastically for Gemini 1.5 Pro to ingest full documents
     submission_preview = submission_content[:15000] if len(submission_content) > 15000 else submission_content
     
-    # --- 3-TRIAL LIMIT LOGIC ---
+    # ==========================================
+    # 🔥 BULLETPROOF FAIL-SAFE FALLBACK
+    # ==========================================
+    fallback_result = {
+        "feedback": "We experienced a system interruption while reviewing your work. Please double-check your submission and try again.",
+        "passed": False,
+        "score": 0,
+        "error_tag": "[ERR_SYSTEM]"
+    }
+
+    # If the system crashes on the 3rd attempt, forcefully pass them forward!
+    if attempt_number >= 3:
+        fallback_result["passed"] = True
+        fallback_result["score"] = 65
+        fallback_result["feedback"] = "We are moving you to the next stage so you can continue progressing, but please take time to study the materials provided for this task to strengthen your understanding."
+    
+    # ==========================================
+    # EVALUATION RULES
+    # ==========================================
     if attempt_number >= 3:
         evaluation_rules = """
         🚨 CRITICAL RULE: This is the user's 3rd and final attempt for the day.
@@ -105,7 +124,6 @@ Badge Opportunity: {badge_opportunity or "None"}
                 if text.endswith("```"):
                     text = text[:-3]
 
-        import re
         json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
         
         if json_match:
@@ -123,15 +141,12 @@ Badge Opportunity: {badge_opportunity or "None"}
                 result["score"] = 50
             return result
             
-    except (json.JSONDecodeError, AttributeError, IndexError) as e:
-        print(f"[SOLA ERROR] JSON parsing failed: {e}")
+    except Exception as e:
+        # This broad catch ensures absolutely NO unhandled errors crash the server
+        print(f"[SOLA ERROR] System or parsing failure: {e}")
     
-    return {
-        "feedback": "Unable to generate review due to a system error. Please resubmit your work.",
-        "passed": False,
-        "score": 0,
-        "error_tag": "[ERR_SYSTEM]"
-    }
+    # If anything failed in the try block, we safely return the bulletproof default
+    return fallback_result
 
 
 async def respond_to_message(

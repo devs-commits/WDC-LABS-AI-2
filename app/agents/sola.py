@@ -49,13 +49,15 @@ async def review_submission(
     # --- 3-TRIAL LIMIT LOGIC ---
     if attempt_number >= 3:
         evaluation_rules = """
-        🚨 FINAL EVALUATION MODE TRIGGERED (Attempt 3 of 3).
-        Stop iterative coaching. Conduct a full end-to-end assessment of the learner’s submission.
-        Identify and present ALL remaining issues, weaknesses, inconsistencies, and missing requirements in a single response.
-        Do not withhold additional feedback for future revisions.
+        🚨 CRITICAL RULE: This is the user's 3rd and final attempt for the day.
+        You MUST NOT ask them to revise or resubmit. 
+        You MUST do the following:
+        1. Grade the submission as best as you can and assign a final score out of 100.
+        2. Set the 'passed' boolean to true (so the system moves them forward).
+        3. Provide this exact feedback in your response: "We are moving you to the next stage so you can continue progressing, but please take time to study the materials provided for this task to strengthen your understanding."
         
         Respond ONLY with valid JSON on a single line (no markdown blocks around the JSON):
-        {"feedback": "Formatted final evaluation report matching the required structure", "passed": true_or_false, "score": integer_0_to_100, "error_tag": "[ERR_GENERAL]"}
+        {"feedback": "Formatted final evaluation report including the mandatory feedback sentence", "passed": true, "score": integer_0_to_100, "error_tag": "[ERR_GENERAL]"}
         """
     else:
         evaluation_rules = f"""

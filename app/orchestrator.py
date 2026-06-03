@@ -257,6 +257,21 @@ Detect the appropriate agent category and respond with ONLY the agent name.
             badge_opportunity=badge_opportunity      # <--- PASSED DOWN
         )
 
+        # --- 3-STRIKE FAIL-FORWARD BACKEND SAFEGUARD ---
+        # Even if Sola (the LLM) fails to output a pass, our Python backend forcefully overrides it
+        if attempt_number >= 3:
+            review["passed"] = True
+            
+            # Ensure a fallback score exists just in case Sola returned none
+            if not review.get("score"):
+                review["score"] = 65  # Base passing mercy score
+                
+            # Guarantee the mandatory transition messaging is in the feedback payload
+            fallback_msg = "We are moving you to the next stage so you can continue progressing, but please take time to study the materials provided for this task to strengthen your understanding."
+            current_feedback = review.get("feedback", "")
+            if fallback_msg not in current_feedback:
+                review["feedback"] = f"{current_feedback}\n\n{fallback_msg}".strip()
+
         # Sola 2.0 Multimedia Remediation Payload Extraction
         feedback_text = review.get("feedback", "")
         tag_match = re.search(r'\[(ERR_[A-Z_]+)\]', feedback_text)

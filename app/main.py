@@ -134,12 +134,15 @@ ALLOWED_ORIGINS = [
     "https://labs.wdc.ng",
     "https://www.labs.wdc.ng",
     "http://localhost:3000",
-    "http://localhost:3001"
+    "http://localhost:3001",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001"
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

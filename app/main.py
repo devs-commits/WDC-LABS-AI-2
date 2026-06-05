@@ -609,7 +609,7 @@ async def review_submission(
         ) from e
 
 # ============================================================
-# TASK REQUEST MODEL
+# TASK REQUEST MODELS
 # ============================================================
 
 class TaskRequest(BaseModel):
@@ -622,6 +622,15 @@ class TaskRequest(BaseModel):
     user_city: Optional[str] = None
     include_ethical_trap: Optional[bool] = False
     include_video_brief: Optional[bool] = True
+
+class GenerateCVRequest(BaseModel):
+    user_id: str
+    user_name: Optional[str] = "WDC Intern"
+    track: Optional[str] = "General"
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    feedback: Optional[List[dict]] = []
+    tasks: List[dict]
 
 # ============================================================
 # SERPER RESOURCE ENRICHMENT (UPDATED FOR 3 VIDEOS / 2 DOCS)
@@ -935,6 +944,31 @@ async def generate_tasks(req: TaskRequest):
                 f"{str(e)}"
             )
         ) from e
+
+
+# ============================================================
+# CV GENERATION ENDPOINT (COACH KEMI)
+# ============================================================
+
+@app.post("/generate-cv")
+async def generate_cv_endpoint(req: GenerateCVRequest):
+    try:
+        from app.agents import kemi
+        
+        cv_content = await kemi.generate_full_resume(
+            user_id=req.user_id,
+            user_name=req.user_name,
+            track=req.track,
+            start_date=req.start_date,
+            end_date=req.end_date,
+            tasks=req.tasks,
+            feedback=req.feedback,
+            model=model
+        )
+        return {"success": True, "cv_content": cv_content}
+    except Exception as e:
+        logger.error(f"CV Generation Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================
 # STARTUP EVENT

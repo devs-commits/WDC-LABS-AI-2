@@ -246,3 +246,70 @@ Respond with JSON:
             "tip": "Be yourself and answer honestly.",
             "evaluation": None
         }
+
+async def generate_full_resume(
+    user_id: str,
+    user_name: str,
+    track: str,
+    start_date: Optional[str],
+    end_date: Optional[str],
+    tasks: List[dict],
+    feedback: List[dict],
+    model: genai.GenerativeModel
+) -> str:
+    """
+    Generates a high-converting, ATS-friendly Markdown resume.
+    """
+    system_prompt = get_system_prompt()
+    
+    feedback_map = {str(item.get("task_id")): item.get("feedback", "") for item in feedback}
+    
+    history_text = ""
+    for task in tasks:
+        t_id = str(task.get("id", ""))
+        title = task.get("title", "Task")
+        desc = task.get("brief_content", "")
+        fb = feedback_map.get(t_id, "Completed successfully.")
+        
+        history_text += f"- Task: {title}\n  Description: {desc}\n  Supervisor Feedback: {fb}\n\n"
+        
+    prompt = f"""
+{system_prompt}
+
+**CANDIDATE DATA:**
+Name: {user_name}
+Track: {track}
+Tasks & Feedback:
+{history_text}
+
+You are an elite Executive Recruiter writing a highly professional, ATS-optimized resume for this candidate based ONLY on their completed tasks. 
+
+**RULES FOR THE RESUME:**
+1. **Formatting**: Use strict Markdown. Use `#` for the Name, `###` for section headers.
+2. **Tone**: Confident, highly professional, action-oriented.
+3. **Bullet Points**: Use the "Harvard Resume Format" (Action Verb + Project/Task + Result/Impact). Infer the professional impact based on the Supervisor Feedback.
+
+**REQUIRED STRUCTURE:**
+
+# [Candidate Name]
+**[Track Title e.g. Data Analyst / Cyber Security Specialist]**
+
+---
+
+### PROFESSIONAL SUMMARY
+(Write a compelling 3-sentence summary highlighting their practical experience, number of completed simulations, and technical capabilities proven in WDC Labs.)
+
+### TECHNICAL & CORE COMPETENCIES
+(List 6-8 relevant skills as bullet points, derived from their tasks.)
+
+### PROFESSIONAL EXPERIENCE
+**WDC Labs** | *Virtual {track.replace('-', ' ').title()} Intern*
+(Translate their tasks into 4-6 incredibly strong bullet points. Do not just list the task descriptions—reframe them as professional achievements. Example: "Engineered X by utilizing Y, resulting in Z (as verified by technical supervisor).")
+
+### EDUCATION & CERTIFICATIONS
+* **WDC Labs Immersive Career Program** - Certificate of Completion
+* *[Add your personal Education here]*
+"""
+
+    response = await model.generate_content_async(prompt)
+    return response.text

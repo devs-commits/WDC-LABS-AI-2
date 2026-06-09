@@ -35,7 +35,7 @@ from docx import Document
 
 from pydantic import BaseModel
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -517,7 +517,7 @@ async def generate_onboarding_intro(
         )
 
 # ============================================================
-# SUBMISSION REVIEW
+# SUBMISSION REVIEW (UPDATED FILE EXTRACTION)
 # ============================================================
 
 @app.post(
@@ -530,6 +530,7 @@ async def review_submission(
     try:
         file_content = request.file_content or ""
 
+        # 1. Process standard URL-based file submissions
         if (
             request.file_url
             and request.file_url.startswith("http")
@@ -554,6 +555,8 @@ async def review_submission(
                     mime, _ = mimetypes.guess_type(
                         request.file_url
                     )
+                    
+                    # Intercept URL bytes with custom extractor
                     extracted = extract_text_from_file(
                         file_url=request.file_url,
                         file_content_bytes=res.content,
@@ -573,9 +576,26 @@ async def review_submission(
                         )
             except Exception as e:
                 logger.error(
-                    f"FILE EXTRACTION ERROR: {str(e)}"
+                    f"FILE EXTRACTION ERROR (URL): {str(e)}"
                 )
 
+        # 2. Check if a raw byte array payload was submitted (direct file upload)
+        # Note: If your frontend sends base64/bytes directly in request.file_content,
+        # ensure it runs through the extractor if it's an excel/word signature.
+        elif request.file_content and "PK\x03\x04" in request.file_content:
+            try:
+                # Intercept direct string uploads with custom extractor
+                extracted = extract_text_from_file(
+                    file_url="",
+                    file_content_bytes=request.file_content.encode('utf-8', 'ignore'),
+                    mime_type=""
+                )
+                if extracted and "error" not in extracted.lower():
+                    file_content = extracted
+            except Exception as e:
+                logger.error(f"FILE EXTRACTION ERROR (Direct): {str(e)}")
+
+        # 3. Final submission evaluation via Sola's strictly graded brain
         result = await orchestrator.review_submission(
             task_title=request.task_title,
             task_brief=request.task_brief,

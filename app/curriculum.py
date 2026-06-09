@@ -3,6 +3,7 @@ WDC Labs Curriculum Definitions.
 Maps specific task numbers in a track to learning objectives, topics, and gamification badges.
 """
 import datetime
+from dateutil import parser
 
 FRAMEWORK_DEFINITIONS = {
     "3i_principles": "Initiate, Iterate, Integrate"
@@ -160,45 +161,149 @@ def get_curriculum_step(track: str, task_number: int):
 
 
 # ============================================================
-# PROGRESSION & BADGE ENGINE
+# PROGRESSION & BADGE ENGINE (UPDATED FOR GRADING GATE)
 # ============================================================
 
-def process_task_completion(supabase_client, user_id, track: str, completed_week: int):
-    """
-    IMPORTANT: Do NOT call this inside emem.py. 
-    Call this function from your API Route or Orchestrator exactly where you run the code 
-    that marks the task as 'completed' in the database.
-    """
-    track_key = track.lower().replace(" ", "_").replace("-", "_")
-    
-    # 1. Calculate new identity
-    new_identity = get_identity_for_week(track_key, completed_week)
-    
-    # 2. Update user_progression table
-    progression_data = {
-        "user_id": user_id,
-        "current_week": completed_week,
-        "current_identity": new_identity,
-        "week_status": "passed_waiting",
-        "updated_at": datetime.datetime.utcnow().isoformat()
-    }
-    
-    supabase_client.table("user_progression").upsert(
-        progression_data
-    ).execute()
-    
-    # 3. Automatically award a badge if this week has one!
-    curriculum_step = CURRICULUM.get(track_key, {}).get(completed_week, {})
-    badge_to_award = curriculum_step.get("badge_opportunity")
-    
+def process_task_completion(supabase_client, user_id, track: str, current_week: int, score: int):
+"""
+Evaluates the student's score, awards badges, and executes Catch-Up logic
+if the student is behind the global timeline.
+"""
+track_key = track.lower().replace(" ", "*").replace("-", "*")
+passed = score >= 50
+
+```
+# Check if a badge is earned for this week
+curriculum_step = CURRICULUM.get(track_key, {}).get(current_week, {})
+badge_to_award = curriculum_step.get("badge_opportunity")
+
+if passed:
+    print(f"✅ User {user_id} scored {score}. Evaluating progression timeline...")
+
+    # ==================================================
+    # FETCH USER START DATE
+    # ==================================================
+    prog_response = (
+        supabase_client
+        .table("user_progression")
+        .select("created_at")
+        .eq("user_id", user_id)
+        .execute()
+    )
+
+    expected_week = current_week
+
+    if prog_response.data:
+        try:
+            created_at_str = prog_response.data[0]["created_at"]
+            created_at = parser.isoparse(created_at_str).replace(tzinfo=None)
+
+            days_active = (
+                datetime.datetime.utcnow() - created_at
+            ).days
+
+            expected_week = (days_active // 7) + 1
+
+            print(
+                f"📅 User active for {days_active} days. "
+                f"Expected Week: {expected_week}"
+            )
+
+        except Exception as e:
+            print(f"⚠️ Expected week calculation failed: {e}")
+
+    # ==================================================
+    # CATCH-UP ENGINE
+    # ==================================================
+    if expected_week > current_week and current_week < 24:
+
+        next_week = current_week + 1
+        new_identity = get_identity_for_week(track_key, next_week)
+
+        progression_data = {
+            "user_id": user_id,
+            "current_week": next_week,
+            "current_identity": new_identity,
+            "week_status": "in_progress",
+            "updated_at": datetime.datetime.utcnow().isoformat()
+        }
+
+        supabase_client.table(
+            "user_progression"
+        ).upsert(progression_data).execute()
+
+        print(
+            f"⚡ CATCH-UP TRIGGERED! "
+            f"User {user_id} progressed to Week {next_week}."
+        )
+
+    else:
+
+        new_identity = get_identity_for_week(
+            track_key,
+            current_week
+        )
+
+        progression_data = {
+            "user_id": user_id,
+            "current_week": current_week,
+            "current_identity": new_identity,
+            "week_status": "passed_waiting",
+            "updated_at": datetime.datetime.utcnow().isoformat()
+        }
+
+        supabase_client.table(
+            "user_progression"
+        ).upsert(progression_data).execute()
+
+        print(
+            f"🔒 User {user_id} is on schedule. "
+            f"Marked as 'passed_waiting'."
+        )
+
+    # ==================================================
+    # BADGE AWARDS
+    # ==================================================
     if badge_to_award:
+
         badge_data = {
             "user_id": user_id,
             "badge_name": badge_to_award,
-            "earned_in_week": completed_week
+            "earned_in_week": current_week
         }
+
         try:
-            supabase_client.table("user_badges").insert(badge_data).execute()
-            print(f"🎉 Successfully awarded '{badge_to_award}' badge to user {user_id}!")
+            supabase_client.table(
+                "user_badges"
+            ).insert(badge_data).execute()
+
+            print(
+                f"🎉 Successfully awarded "
+                f"'{badge_to_award}' badge to user {user_id}!"
+            )
+
         except Exception as e:
-            print(f"User {user_id} already has badge '{badge_to_award}' or an error occurred: {e}")
+            print(
+                f"Badge '{badge_to_award}' already exists "
+                f"or an error occurred: {e}"
+            )
+
+else:
+
+    progression_data = {
+        "user_id": user_id,
+        "current_week": current_week,
+        "week_status": "needs_revision",
+        "updated_at": datetime.datetime.utcnow().isoformat()
+    }
+
+    supabase_client.table(
+        "user_progression"
+    ).upsert(progression_data).execute()
+
+    print(
+        f"❌ User {user_id} scored {score} (<50). "
+        f"Marked as 'needs_revision'."
+    )
+
+return passed

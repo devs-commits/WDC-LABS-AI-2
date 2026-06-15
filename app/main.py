@@ -424,7 +424,9 @@ async def health_check():
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     try:
-        return await orchestrator.route_message(
+        # Wrap Sola's chat routing in our exponential backoff retry engine
+        return await generate_with_retry(
+            orchestrator.route_message,
             message=request.message,
             context=request.context,
             chat_history=request.chat_history or []
@@ -742,7 +744,9 @@ async def review_submission(
                 logger.error(f"FILE EXTRACTION ERROR (Direct): {str(e)}")
 
         # 3. Final submission evaluation via Sola's strictly graded brain
-        result = await orchestrator.review_submission(
+        # NOW PROTECTED WITH EXPONENTIAL BACKOFF RETRY
+        result = await generate_with_retry(
+            orchestrator.review_submission,
             task_title=request.task_title,
             task_brief=request.task_brief,
             submission_content=(

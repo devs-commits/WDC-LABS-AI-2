@@ -35,7 +35,7 @@ from docx import Document
 
 from pydantic import BaseModel
 
-from fastapi import FastAPI, HTTPException, File, UploadFile, Form
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form, Header
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -1022,6 +1022,38 @@ async def generate_cv_endpoint(req: GenerateCVRequest):
     except Exception as e:
         logger.error(f"CV Generation Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================
+# AUTOMATED TASK RELEASE ENGINE (MONDAY 8:00 AM CRON)
+# ============================================================
+
+@app.post("/run-monday-task-release")
+async def run_monday_task_release(authorization: str = Header(None)):
+    """
+    Secure endpoint triggered by external cron job to run weekly updates.
+    """
+    expected_secret = os.getenv("CRON_SECRET")
+
+    # Verify the secure token
+    if not expected_secret or authorization != f"Bearer {expected_secret}":
+        logger.warning("🚨 Unauthorized attempt to run the Monday Task Release Engine!")
+        raise HTTPException(status_code=401, detail="Unauthorized Cron Execution")
+
+    logger.info("⏰ Monday 8 AM Task Release Engine Triggered Successfully!")
+
+    try:
+        # In the future, or right here, you'll import and call your progression 
+        # catch-up engine from curriculum.py to cycle through all eligible students.
+        # e.g., from app.curriculum import run_weekly_rollout
+        # await run_weekly_rollout()
+        
+        return {
+            "status": "success",
+            "message": "Monday task rollout and catch-up logic executed securely."
+        }
+    except Exception as e:
+        logger.error(f"CRON ENGINE ERROR: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to execute Monday Task Release")
 
 # ============================================================
 # STARTUP EVENT

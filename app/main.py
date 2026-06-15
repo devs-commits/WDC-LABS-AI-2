@@ -244,6 +244,152 @@ def deduplicate_links(
     return deduped[:max_links]
 
 # ============================================================
+# ASYNC QUEUE WORKER ENGINE FOR TASKS
+# ============================================================
+
+task_queue = asyncio.Queue()
+
+async def generate_with_retry(func, *args, max_retries=5, **kwargs):
+    base_delay = 2
+    for attempt in range(max_retries):
+        try:
+            return await func(*args, **kwargs)
+        except Exception as e:
+            error_msg = str(e)
+            if "429" in error_msg or "Quota" in error_msg:
+                if attempt == max_retries - 1:
+                    logger.error("Max retries hit for Gemini API. Giving up.")
+                    raise e
+                
+                delay = base_delay * (2 ** attempt) 
+                logger.warning(f"Rate limited (429)! Retrying in {delay} seconds...")
+                await asyncio.sleep(delay)
+            else:
+                raise e 
+
+async def queue_worker():
+    while True:
+        req = await task_queue.get()
+        try:
+            logger.info(f"⚙️ Background Worker processing task generation for {req.user_name}")
+            
+            # --- YOUR EXACT TASK GENERATION LOGIC MOVED HERE ---
+            task = await generate_with_retry(
+                generate_task,
+                user_name=req.user_name,
+                track=req.track,
+                deadline_display=req.deadline_display,
+                experience_level=req.experience_level,
+                difficulty=req.difficulty,
+                task_number=req.task_number,
+                user_city=req.user_city,
+                include_ethical_trap=req.include_ethical_trap,
+                model=model,
+                include_video_brief=req.include_video_brief
+            )
+
+            if not isinstance(task, dict):
+                logger.error("Task generation returned invalid response format")
+                continue
+
+            # =================================================
+            # PLATFORM-WIDE TITLE SANITIZATION SWEEP
+            # =================================================
+            if "title" in task and isinstance(task["title"], str):
+                raw_title = task["title"]
+                user_name = req.user_name
+
+                if user_name.lower() in raw_title.lower():
+                    raw_title = re.sub(
+                        rf"{re.escape(user_name)}\s*[:\-\|]*\s*", 
+                        "", 
+                        raw_title, 
+                        flags=re.IGNORECASE
+                    )
+                
+                if ":" in raw_title:
+                    raw_title = raw_title.split(":")[-1]
+
+                task["title"] = raw_title.strip()
+
+            # =================================================
+            # RESOURCE ENRICHMENT ON CLEAN SUBJECT
+            # =================================================
+            SERPER_API_KEY = os.getenv("SERPER_API_KEY")
+
+            if SERPER_API_KEY:
+                task_title = task.get("title", "tutorial")
+
+                enrichment = await fetch_serper_resources(
+                    track=req.track,
+                    task_title=task_title,
+                    api_key=SERPER_API_KEY
+                )
+
+                discovered_links = enrichment.get("links", [])
+                cache_results = enrichment.get("cache_results", [])
+
+                if discovered_links:
+                    existing_resources = task.get("educational_resources", "")
+                    all_links = []
+
+                    if existing_resources and isinstance(existing_resources, str):
+                        all_links.extend([
+                            link.strip() for link in existing_resources.split(",") if link.strip()
+                        ])
+
+                    all_links.extend(discovered_links)
+                    deduped_links = deduplicate_links(all_links, max_links=15)
+                    task["educational_resources"] = ",".join(deduped_links)
+
+                if cache_results:
+                    cache_query = f"{req.track} {task_title}"
+                    await sync_search_cache(query=cache_query, results=cache_results)
+
+            logger.info(f"✅ Background task fully generated for {req.user_name}!")
+            
+            # ============================================================
+            # 💾 SAVE THE GENERATED TASK TO SUPABASE 'tasks' TABLE
+            # ============================================================
+            SUPABASE_URL = os.getenv("SUPABASE_URL")
+            SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
+            
+            if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+                # IMPORTANT: If your 'tasks' table columns are named slightly differently 
+                # (e.g., 'task_content' instead of 'task_data'), update the keys below to match!
+                db_payload = {
+                    "user_id": req.user_id,
+                    "track": req.track,
+                    "task_number": req.task_number,
+                    "task_data": task, 
+                    "status": "active"
+                }
+
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    db_res = await client.post(
+                        f"{SUPABASE_URL}/rest/v1/tasks",
+                        headers={
+                            "apikey": SUPABASE_SERVICE_KEY,
+                            "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+                            "Content-Type": "application/json",
+                            "Prefer": "return=minimal"
+                        },
+                        json=db_payload
+                    )
+
+                    if db_res.status_code >= 400:
+                        logger.error(f"❌ SUPABASE SAVE FAILED: {db_res.status_code} | {db_res.text}")
+                    else:
+                        logger.info(f"💾 Successfully saved Week {req.task_number} task for {req.user_name} to the 'tasks' table!")
+            else:
+                logger.error("Missing Supabase Environment Variables. Cannot save task.")
+
+        except Exception as e:
+            logger.error(f"TASK GENERATION BACKGROUND ERROR: {str(e)}")
+        finally:
+            task_queue.task_done()
+
+# ============================================================
 # ROOT ENDPOINT
 # ============================================================
 
@@ -633,6 +779,7 @@ async def review_submission(
 # ============================================================
 
 class TaskRequest(BaseModel):
+    user_id: str
     user_name: str
     track: str
     deadline_display: str
@@ -830,141 +977,23 @@ async def sync_search_cache(
         )
 
 # ============================================================
-# TASK GENERATION ENDPOINT (WITH DEEP SCRUBBING ENGINE)
+# TASK GENERATION ENDPOINT (NOW QUEUE-BASED!)
 # ============================================================
 
 @app.post("/generate-tasks")
 async def generate_tasks(req: TaskRequest):
-    try:
-        task = await generate_task(
-            user_name=req.user_name,
-            track=req.track,
-            deadline_display=req.deadline_display,
-            experience_level=req.experience_level,
-            difficulty=req.difficulty,
-            task_number=req.task_number,
-            user_city=req.user_city,
-            include_ethical_trap=req.include_ethical_trap,
-            model=model,
-            include_video_brief=req.include_video_brief
-        )
-
-        if not isinstance(task, dict):
-            raise HTTPException(
-                status_code=500,
-                detail=(
-                    "Task generation returned "
-                    "invalid response format"
-                )
-            )
-
-        # =================================================
-        # PLATFORM-WIDE TITLE SANITIZATION SWEEP
-        # =================================================
-        if "title" in task and isinstance(task["title"], str):
-            raw_title = task["title"]
-            user_name = req.user_name
-
-            # Level 1: Wipe exact case-insensitive username strings + common dividers
-            if user_name.lower() in raw_title.lower():
-                raw_title = re.sub(
-                    rf"{re.escape(user_name)}\s*[:\-\|]*\s*", 
-                    "", 
-                    raw_title, 
-                    flags=re.IGNORECASE
-                )
-            
-            # Level 2: Strict colon partition purge to clear lingering role prefixes
-            if ":" in raw_title:
-                raw_title = raw_title.split(":")[-1]
-
-            # Lock the sanitized pure subject back into the platform task payload
-            task["title"] = raw_title.strip()
-
-        # =================================================
-        # RESOURCE ENRICHMENT ON CLEAN SUBJECT
-        # =================================================
-        SERPER_API_KEY = os.getenv(
-            "SERPER_API_KEY"
-        )
-
-        if SERPER_API_KEY:
-            task_title = task.get(
-                "title",
-                "tutorial"
-            )
-
-            enrichment = await fetch_serper_resources(
-                track=req.track,
-                task_title=task_title,
-                api_key=SERPER_API_KEY
-            )
-
-            discovered_links = enrichment.get(
-                "links",
-                []
-            )
-
-            cache_results = enrichment.get(
-                "cache_results",
-                []
-            )
-
-            if discovered_links:
-                existing_resources = task.get(
-                    "educational_resources",
-                    ""
-                )
-
-                all_links = []
-
-                if (
-                    existing_resources
-                    and isinstance(
-                        existing_resources,
-                        str
-                    )
-                ):
-                    all_links.extend([
-                        link.strip()
-                        for link in (
-                            existing_resources.split(",")
-                        )
-                        if link.strip()
-                    ])
-
-                all_links.extend(discovered_links)
-                
-                deduped_links = deduplicate_links(
-                    all_links,
-                    max_links=15
-                )
-
-                task["educational_resources"] = ",".join(deduped_links)
-
-            if cache_results:
-                cache_query = f"{req.track} {task_title}"
-                await sync_search_cache(
-                    query=cache_query,
-                    results=cache_results
-                )
-
-        return {
-            "tasks": [task]
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception("TASK GENERATION ERROR")
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                f"Task generation failed: "
-                f"{str(e)}"
-            )
-        ) from e
-
+    """
+    Instantly accepts the request and drops it into the async queue.
+    Prevents frontend 504 timeouts and shields the user from 429 Quota errors.
+    """
+    await task_queue.put(req)
+    
+    # Shield the frontend: Return a clean 202-style accepted state immediately
+    return {
+        "status": "processing",
+        "message": "Your task is being safely generated by the AI Engine. This might take a moment.",
+        "queue_position": task_queue.qsize()
+    }
 
 # ============================================================
 # CV GENERATION ENDPOINT (COACH KEMI)
@@ -999,3 +1028,7 @@ async def startup_event():
     logger.info("🚀 WDC Labs AI Backend starting...")
     logger.info("✅ Gemini configured")
     logger.info("✅ Orchestrator ready")
+    
+    # 🔥 Spin up the background worker to listen to the queue!
+    asyncio.create_task(queue_worker())
+    logger.info("✅ Queue Worker active")

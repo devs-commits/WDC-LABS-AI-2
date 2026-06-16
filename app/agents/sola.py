@@ -66,7 +66,7 @@ async def review_submission(
         
         FORMATTING RULES:
         1. You MUST start your feedback with a large markdown header showing the score: "### 🎯 FINAL SCORE: [Score]/100\n\n"
-        2. If they score below 50, your feedback MUST end with this exact phrase on a new line: "**This was your final attempt for today. Please take time to study the recommended resources carefully and try again tomorrow.**"
+        2. If they score below 50, your feedback MUST end with this exact phrase on a new line: "**This was your final attempt for today. Please take time to review my feedback carefully. The system will now move you to the next phase.**"
         """
     else:
         attempts_left = 3 - attempt_number
@@ -104,10 +104,9 @@ async def review_submission(
     - Use **bold text** to highlight key terms.
     
     RULES:
-    1. NO FREE PASSES. If it does not meet the 50% threshold, hold the line and fail them.
-    2. Focus on major blockers; structure feedback exactly as: Positive, Pivot, Why, Badge Verdict, Tag, Encouragement.
-    3. Determine the numerical score (0-100).
-    4. Set 'passed' to true ONLY if the score is 50 or higher. Set to false if below 50.
+    1. Focus on major blockers; structure feedback exactly as: Positive, Pivot, Why, Badge Verdict, Tag, Encouragement.
+    2. Determine the numerical score (0-100).
+    3. Set 'passed' to true ONLY if the score is 50 or higher. Set to false if below 50.
     
     Respond ONLY with valid JSON on a single line (no markdown blocks around the JSON):
     {{"feedback": "Your beautifully formatted, spaced-out coaching message", "passed": true_or_false, "score": integer_0_to_100, "error_tag": "[ERR_TAG]"}}
@@ -156,8 +155,12 @@ Badge Opportunity: {badge_opportunity or "None"}
                 if "score" not in result:
                     result["score"] = 50
                     
-                # HARD ENFORCE SCORE-TO-PASS LOGIC
-                if result["score"] < 50:
+                # ==========================================
+                # 🔥 HARD ENFORCE SCORE-TO-PASS LOGIC (WITH 3-STRIKE OVERRIDE)
+                # ==========================================
+                if attempt_number >= 3:
+                    result["passed"] = True  # Forced Fail-Forward Pass
+                elif result["score"] < 50:
                     result["passed"] = False
                 else:
                     result["passed"] = True
@@ -170,8 +173,12 @@ Badge Opportunity: {badge_opportunity or "None"}
             if "score" not in result:
                 result["score"] = 50
                 
-            # HARD ENFORCE SCORE-TO-PASS LOGIC
-            if result["score"] < 50:
+            # ==========================================
+            # 🔥 HARD ENFORCE SCORE-TO-PASS LOGIC (WITH 3-STRIKE OVERRIDE)
+            # ==========================================
+            if attempt_number >= 3:
+                result["passed"] = True  # Forced Fail-Forward Pass
+            elif result["score"] < 50:
                 result["passed"] = False
             else:
                 result["passed"] = True

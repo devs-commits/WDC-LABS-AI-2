@@ -164,20 +164,22 @@ def get_curriculum_step(track: str, task_number: int):
 # PROGRESSION & BADGE ENGINE (UPDATED FOR GRADING GATE)
 # ============================================================
 
-def process_task_completion(supabase_client, user_id, track: str, current_week: int, score: int):
+def process_task_completion(supabase_client, user_id, track: str, current_week: int, score: int, attempt_number: int = 1):
     """
     Evaluates the student's score, awards badges, and executes Catch-Up logic
     if the student is behind the global timeline.
     """
     track_key = track.lower().replace(" ", "_").replace("-", "_")
-    passed = score >= 50
+    
+    # 🔥 THE FAIL-FORWARD FIX: Automatically pass on 3rd attempt regardless of score
+    passed = (score >= 50) or (attempt_number >= 3)
 
     # Check if a badge is earned for this week
     curriculum_step = CURRICULUM.get(track_key, {}).get(current_week, {})
     badge_to_award = curriculum_step.get("badge_opportunity")
 
     if passed:
-        print(f"✅ User {user_id} scored {score}. Evaluating progression timeline...")
+        print(f"✅ User {user_id} scored {score} (Attempt {attempt_number}). Evaluating progression timeline...")
 
         # ==================================================
         # FETCH USER START DATE

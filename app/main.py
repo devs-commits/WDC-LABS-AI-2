@@ -354,15 +354,19 @@ async def queue_worker():
             SUPABASE_URL = os.getenv("SUPABASE_URL")
             SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
             
-            if SUPABASE_URL and SUPABASE_SERVICE_KEY:
-                # IMPORTANT: If your 'tasks' table columns are named slightly differently 
-                # (e.g., 'task_content' instead of 'task_data'), update the keys below to match!
-                db_payload = {
-                    "user_id": req.user_id,
-                    "track": req.track,
+            db_payload = {
+                    "user": req.user_id,
+                    "title": task.get("title", "New Assignment"),
+                    "brief_content": task.get("brief_content", task.get("brief", task.get("description", "Please review the resources."))),
+                    "difficulty": task.get("difficulty", req.difficulty or "intermediate"),
+                    "task_track": req.track,
+                    "ai_persona_config": task.get("ai_persona_config", default_persona),
+                    "completed": False,
+                    "status": "pending",
                     "task_number": req.task_number,
-                    "task_data": task, 
-                    "status": "active"
+                    "resources": resource_array, # 🔥 CRITICAL: This injects the 3 Videos & 2 PDFs!
+                    "video_brief": task.get("video_brief", ""),
+                    "deadline_display": task.get("deadline_display", req.deadline_display or "Friday, 11:59 PM")
                 }
 
                 async with httpx.AsyncClient(timeout=15.0) as client:

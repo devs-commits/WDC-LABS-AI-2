@@ -316,6 +316,26 @@ async def queue_worker():
             # RESOURCE ENRICHMENT ON CLEAN SUBJECT
             # =================================================
             SERPER_API_KEY = os.getenv("SERPER_API_KEY")
+            
+            # Initialize resource_array here before it is used
+            resource_array = []
+            
+            # Extract basic educational resources first
+            existing_resources = task.get("educational_resources", "")
+            if isinstance(existing_resources, str) and existing_resources:
+                import time
+                for i, raw_link in enumerate(existing_resources.split(",")):
+                    clean_link = raw_link.strip()
+                    if clean_link:
+                        is_yt = "youtube" in clean_link or "youtu.be" in clean_link
+                        resource_array.append({
+                            "id": f"res-ai-{i}-{int(time.time())}",
+                            "title": f"Learning Resource {i + 1}",
+                            "type": "video" if is_yt else ("pdf" if clean_link.lower().endswith(".pdf") else "web"),
+                            "category": "Video Resources" if is_yt else "Reference Links",
+                            "description": "Video tutorial supporting this task" if is_yt else "Helpful article or PDF for completing this task",
+                            "url": clean_link
+                        })
 
             if SERPER_API_KEY:
                 task_title = task.get("title", "tutorial")
@@ -325,26 +345,24 @@ async def queue_worker():
                     task_title=task_title,
                     api_key=SERPER_API_KEY
                 )
+                
+                import time
+                for i, cache_res in enumerate(enrichment.get("cache_results", [])):
+                    link = cache_res.get("link", cache_res.get("url", ""))
+                    if link:
+                        is_yt = "youtube" in link or "youtu.be" in link
+                        resource_array.append({
+                            "id": f"cache-vid-{i}-{int(time.time())}",
+                            "title": cache_res.get("title", f"Video Guide {i+1}"),
+                            "type": cache_res.get("type", "video" if is_yt else "web"),
+                            "category": cache_res.get("category", "Video Resources"),
+                            "description": cache_res.get("snippet", "Reference material"),
+                            "url": link
+                        })
 
-                discovered_links = enrichment.get("links", [])
-                cache_results = enrichment.get("cache_results", [])
-
-                if discovered_links:
-                    existing_resources = task.get("educational_resources", "")
-                    all_links = []
-
-                    if existing_resources and isinstance(existing_resources, str):
-                        all_links.extend([
-                            link.strip() for link in existing_resources.split(",") if link.strip()
-                        ])
-
-                    all_links.extend(discovered_links)
-                    deduped_links = deduplicate_links(all_links, max_links=15)
-                    task["educational_resources"] = ",".join(deduped_links)
-
-                if cache_results:
+                if enrichment.get("cache_results"):
                     cache_query = f"{req.track} {task_title}"
-                    await sync_search_cache(query=cache_query, results=cache_results)
+                    await sync_search_cache(query=cache_query, results=enrichment.get("cache_results"))
 
             logger.info(f"✅ Background task fully generated for {req.user_name}!")
             
@@ -354,7 +372,17 @@ async def queue_worker():
             SUPABASE_URL = os.getenv("SUPABASE_URL")
             SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
             
-            db_payload = {
+            if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+                
+                default_persona = {
+                    "role": "Supervisor",
+                    "tone": "professional",
+                    "expertise": req.track,
+                    "instruction": "Review submission thoroughly",
+                    "deadline_display": req.deadline_display or "Friday, 11:59 PM"
+                }
+
+                db_payload = {
                     "user": req.user_id,
                     "title": task.get("title", "New Assignment"),
                     "brief_content": task.get("brief_content", task.get("brief", task.get("description", "Please review the resources."))),
@@ -364,7 +392,7 @@ async def queue_worker():
                     "completed": False,
                     "status": "pending",
                     "task_number": req.task_number,
-                    "resources": resource_array, # 🔥 CRITICAL: This injects the 3 Videos & 2 PDFs!
+                    "resources": resource_array, # Inject the resources
                     "video_brief": task.get("video_brief", ""),
                     "deadline_display": task.get("deadline_display", req.deadline_display or "Friday, 11:59 PM")
                 }

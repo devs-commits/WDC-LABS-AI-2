@@ -17,6 +17,7 @@ import json
 import mimetypes
 import asyncio
 import logging
+import time
 
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -323,7 +324,6 @@ async def queue_worker():
             # Extract basic educational resources first
             existing_resources = task.get("educational_resources", "")
             if isinstance(existing_resources, str) and existing_resources:
-                import time
                 for i, raw_link in enumerate(existing_resources.split(",")):
                     clean_link = raw_link.strip()
                     if clean_link:
@@ -346,7 +346,6 @@ async def queue_worker():
                     api_key=SERPER_API_KEY
                 )
                 
-                import time
                 for i, cache_res in enumerate(enrichment.get("cache_results", [])):
                     link = cache_res.get("link", cache_res.get("url", ""))
                     if link:
@@ -815,16 +814,17 @@ async def review_submission(
 # ============================================================
 
 class TaskRequest(BaseModel):
-    user_id: str
-    user_name: str
-    track: str
-    deadline_display: str
+    user_id: Optional[str] = None
+    user_name: Optional[str] = "Intern"
+    track: Optional[str] = "General"
+    deadline_display: Optional[str] = "Flexible"
     experience_level: Optional[str] = ""
     difficulty: Optional[str] = "intermediate"
     task_number: Optional[int] = 1
     user_city: Optional[str] = None
     include_ethical_trap: Optional[bool] = False
     include_video_brief: Optional[bool] = True
+    previous_performance: Optional[str] = "N/A"
 
 class GenerateCVRequest(BaseModel):
     user_id: str

@@ -789,6 +789,15 @@ async def review_submission(
             attempt_number=request.attempt_number
         )
 
+        # 🔥 NEW FIX: Safely parse portfolio_bullet if Sola returns a dictionary
+        raw_bullet = result.get("portfolio_bullet")
+        if isinstance(raw_bullet, dict):
+            # Extract just the string if she sent a dict
+            clean_bullet = raw_bullet.get("bullet_point", raw_bullet.get("content", str(raw_bullet)))
+        else:
+            # It's already a string (or None)
+            clean_bullet = raw_bullet
+
         return SubmissionReviewResponse(
             feedback=result.get(
                 "feedback",
@@ -796,9 +805,7 @@ async def review_submission(
             ),
             passed=result.get("passed", False),
             score=result.get("score", 0),
-            portfolio_bullet=result.get(
-                "portfolio_bullet"
-            )
+            portfolio_bullet=clean_bullet # Pass the safe, clean string here
         )
     except HTTPException:
         raise

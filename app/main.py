@@ -369,7 +369,7 @@ async def queue_worker():
             # 💾 SAVE THE GENERATED TASK TO SUPABASE 'tasks' TABLE
             # ============================================================
             SUPABASE_URL = os.getenv("SUPABASE_URL")
-            SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
+            SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
             
             if SUPABASE_URL and SUPABASE_SERVICE_KEY:
                 
@@ -967,6 +967,7 @@ async def sync_search_cache(
     SUPABASE_SERVICE_KEY = (
         os.getenv("SUPABASE_SERVICE_ROLE_KEY")
         or os.getenv("SUPABASE_ANON_KEY")
+        or os.getenv("SUPABASE_KEY")
     )
 
     if (

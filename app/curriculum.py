@@ -307,4 +307,4 @@ def process_task_completion(supabase_client, user_id, track: str, current_week: 
             f"Marked as 'needs_revision'."
         )
 
-    return passed
+    return passedD

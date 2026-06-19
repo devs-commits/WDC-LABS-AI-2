@@ -44,6 +44,8 @@ from fastapi.middleware.cors import CORSMiddleware
 # INTERNAL IMPORTS
 # ============================================================
 
+from app.cron import router as cron_router
+
 from app.orchestrator import Orchestrator
 
 from app.schemas import (
@@ -139,6 +141,8 @@ ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001"
 ]
+
+app.include_router(cron_router)
 
 app.add_middleware(
     CORSMiddleware,

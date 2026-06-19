@@ -39,7 +39,7 @@ async def review_submission(
 ) -> dict:
     """
     Review a user's submission as Sola (Technical Lead).
-    Implements STRICT Grading (0-100), 3-strike rule, formatting, and holds the 50% passing line.
+    Implements STRICT Grading (0-100), 3-strike daily rule, formatting, and holds the 50% passing line.
     """
     system_prompt = get_system_prompt()
     
@@ -62,11 +62,11 @@ async def review_submission(
     if attempt_number >= 3:
         attempt_context = """
         🚨 CRITICAL RULE: This is the user's 3rd and FINAL attempt for the day. 
-        You must be definitive. Grade them strictly based on the rubric and assign a FINAL SCORE (0-100).
+        You must be definitive. Grade them strictly based on the rubric and assign a FINAL SCORE (0-100) regardless of whether they pass or fail.
         
         FORMATTING RULES:
-        1. You MUST start your feedback with a large markdown header showing the score: "### 🎯 FINAL SCORE: [Score]/100\n\n"
-        2. If they score below 50, your feedback MUST end with this exact phrase on a new line: "**This was your final attempt for today. Please take time to review my feedback carefully. The system will now move you to the next phase.**"
+        1. You MUST start your feedback with a large markdown header showing the score: "### 🎯 FINAL SCORE FOR TODAY: [Score]/100\n\n"
+        2. If they score below 50, your feedback MUST end with this exact phrase on a new line: "**This was your final attempt for today. Please review my feedback carefully, study the resources, and come back tomorrow to try again.**"
         """
     else:
         attempts_left = 3 - attempt_number
@@ -156,11 +156,9 @@ Badge Opportunity: {badge_opportunity or "None"}
                     result["score"] = 50
                     
                 # ==========================================
-                # 🔥 HARD ENFORCE SCORE-TO-PASS LOGIC (WITH 3-STRIKE OVERRIDE)
+                # 🔥 STRICT SCORE-TO-PASS LOGIC (NO FREE PASSES)
                 # ==========================================
-                if attempt_number >= 3:
-                    result["passed"] = True  # Forced Fail-Forward Pass
-                elif result["score"] < 50:
+                if result["score"] < 50:
                     result["passed"] = False
                 else:
                     result["passed"] = True
@@ -174,11 +172,9 @@ Badge Opportunity: {badge_opportunity or "None"}
                 result["score"] = 50
                 
             # ==========================================
-            # 🔥 HARD ENFORCE SCORE-TO-PASS LOGIC (WITH 3-STRIKE OVERRIDE)
+            # 🔥 STRICT SCORE-TO-PASS LOGIC (NO FREE PASSES)
             # ==========================================
-            if attempt_number >= 3:
-                result["passed"] = True  # Forced Fail-Forward Pass
-            elif result["score"] < 50:
+            if result["score"] < 50:
                 result["passed"] = False
             else:
                 result["passed"] = True

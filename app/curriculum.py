@@ -147,7 +147,12 @@ def get_curriculum_step(track: str, task_number: int):
     Retrieve the specific curriculum step for a given track and task number.
     Injects dynamic gamification identity based on the task_number (week).
     """
-    track_key = track.lower().replace(" ", "_").replace("-", "_")
+    # Force lowercase, replace dashes with underscores, and replace spaces with underscores
+    track_key = str(track).lower().replace("-", "_").replace(" ", "_")
+    
+    # Debug log to verify what the backend is actually trying to look up
+    print(f"DEBUG: Frontend sent track '{track}'. Normalized to '{track_key}'")
+
     track_curriculum = CURRICULUM.get(track_key, {})
     
     step_data = track_curriculum.get(task_number)
@@ -307,4 +312,4 @@ def process_task_completion(supabase_client, user_id, track: str, current_week: 
             f"Marked as 'needs_revision'."
         )
 
-    return passedD
+    return passed

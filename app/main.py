@@ -278,7 +278,6 @@ async def queue_worker():
         try:
             logger.info(f"⚙️ Background Worker processing task generation for {req.user_name}")
             
-            # --- YOUR EXACT TASK GENERATION LOGIC MOVED HERE ---
             task = await generate_with_retry(
                 generate_task,
                 user_name=req.user_name,
@@ -297,9 +296,6 @@ async def queue_worker():
                 logger.error("Task generation returned invalid response format")
                 continue
 
-            # =================================================
-            # PLATFORM-WIDE TITLE SANITIZATION SWEEP
-            # =================================================
             if "title" in task and isinstance(task["title"], str):
                 raw_title = task["title"]
                 user_name = req.user_name
@@ -317,15 +313,9 @@ async def queue_worker():
 
                 task["title"] = raw_title.strip()
 
-            # =================================================
-            # RESOURCE ENRICHMENT ON CLEAN SUBJECT
-            # =================================================
             SERPER_API_KEY = os.getenv("SERPER_API_KEY")
-            
-            # Initialize resource_array here before it is used
             resource_array = []
             
-            # Extract basic educational resources first
             existing_resources = task.get("educational_resources", "")
             if isinstance(existing_resources, str) and existing_resources:
                 for i, raw_link in enumerate(existing_resources.split(",")):
@@ -369,9 +359,6 @@ async def queue_worker():
 
             logger.info(f"✅ Background task fully generated for {req.user_name}!")
             
-            # ============================================================
-            # 💾 SAVE THE GENERATED TASK TO SUPABASE 'tasks' TABLE
-            # ============================================================
             SUPABASE_URL = os.getenv("SUPABASE_URL")
             SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
             
@@ -395,7 +382,7 @@ async def queue_worker():
                     "completed": False,
                     "status": "pending",
                     "task_number": req.task_number,
-                    "resources": resource_array, # Inject the resources
+                    "resources": resource_array,
                     "video_brief": task.get("video_brief", ""),
                     "deadline_display": task.get("deadline_display", req.deadline_display or "Friday, 11:59 PM")
                 }
@@ -459,7 +446,6 @@ async def health_check():
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     try:
-        # Wrap Sola's chat routing in our exponential backoff retry engine
         return await generate_with_retry(
             orchestrator.route_message,
             message=request.message,
@@ -700,7 +686,7 @@ async def generate_onboarding_intro(
         )
 
 # ============================================================
-# SUBMISSION REVIEW (UPDATED FILE EXTRACTION)
+# SUBMISSION REVIEW
 # ============================================================
 
 @app.post(
@@ -713,7 +699,6 @@ async def review_submission(
     try:
         file_content = request.file_content or ""
 
-        # 1. Process standard URL-based file submissions
         if (
             request.file_url
             and request.file_url.startswith("http")
@@ -739,7 +724,6 @@ async def review_submission(
                         request.file_url
                     )
                     
-                    # Intercept URL bytes with custom extractor
                     extracted = extract_text_from_file(
                         file_url=request.file_url,
                         file_content_bytes=res.content,
@@ -762,12 +746,8 @@ async def review_submission(
                     f"FILE EXTRACTION ERROR (URL): {str(e)}"
                 )
 
-        # 2. Check if a raw byte array payload was submitted (direct file upload)
-        # Note: If your frontend sends base64/bytes directly in request.file_content,
-        # ensure it runs through the extractor if it's an excel/word signature.
         elif request.file_content and "PK\x03\x04" in request.file_content:
             try:
-                # Intercept direct string uploads with custom extractor
                 extracted = extract_text_from_file(
                     file_url="",
                     file_content_bytes=request.file_content.encode('utf-8', 'ignore'),
@@ -778,8 +758,6 @@ async def review_submission(
             except Exception as e:
                 logger.error(f"FILE EXTRACTION ERROR (Direct): {str(e)}")
 
-        # 3. Final submission evaluation via Sola's strictly graded brain
-        # NOW PROTECTED WITH EXPONENTIAL BACKOFF RETRY
         result = await generate_with_retry(
             orchestrator.review_submission,
             task_title=request.task_title,
@@ -793,13 +771,10 @@ async def review_submission(
             attempt_number=request.attempt_number
         )
 
-        # 🔥 NEW FIX: Safely parse portfolio_bullet if Sola returns a dictionary
         raw_bullet = result.get("portfolio_bullet")
         if isinstance(raw_bullet, dict):
-            # Extract just the string if she sent a dict
             clean_bullet = raw_bullet.get("bullet_point", raw_bullet.get("content", str(raw_bullet)))
         else:
-            # It's already a string (or None)
             clean_bullet = raw_bullet
 
         return SubmissionReviewResponse(
@@ -809,7 +784,7 @@ async def review_submission(
             ),
             passed=result.get("passed", False),
             score=result.get("score", 0),
-            portfolio_bullet=clean_bullet # Pass the safe, clean string here
+            portfolio_bullet=clean_bullet
         )
     except HTTPException:
         raise
@@ -846,8 +821,15 @@ class GenerateCVRequest(BaseModel):
     feedback: Optional[List[dict]] = []
     tasks: List[dict]
 
+class RegenerateRequest(BaseModel):
+    task_id: int
+    user_name: Optional[str] = "Intern"
+    track: str
+    task_number: int
+    deadline_display: Optional[str] = "Flexible"
+
 # ============================================================
-# SERPER RESOURCE ENRICHMENT (UPDATED FOR 3 VIDEOS / 2 DOCS)
+# SERPER RESOURCE ENRICHMENT
 # ============================================================
 
 async def fetch_serper_resources(
@@ -869,15 +851,12 @@ async def fetch_serper_resources(
 
     async with httpx.AsyncClient(timeout=10.0) as client:
 
-        # ====================================================
-        # DOCUMENTATION / PDF SWEEP (STRICT LIMIT: 2)
-        # ====================================================
         try:
             web_query = f"{track} {pruned_title} tutorial guide filetype:pdf"
             web_res = await client.post(
                 "https://google.serper.dev/search",
                 headers=headers,
-                json={"q": web_query, "num": 5} # Fetch 5 to ensure we get 2 good ones
+                json={"q": web_query, "num": 5}
             )
 
             organic = []
@@ -895,7 +874,6 @@ async def fetch_serper_resources(
                     data = safe_json_response(web_res)
                     organic = data.get("organic", [])
 
-                # ENFORCE STRICT 2 DOCUMENT LIMIT
                 doc_count = 0
                 for item in organic:
                     if doc_count >= 2:
@@ -921,22 +899,18 @@ async def fetch_serper_resources(
         except Exception as e:
             logger.error(f"DOCUMENT SEARCH ERROR: {str(e)}")
 
-        # ====================================================
-        # VIDEO SWEEP (STRICT LIMIT: 3)
-        # ====================================================
         try:
             video_query = f"{track} {pruned_title} tutorial video"
             video_res = await client.post(
                 "https://google.serper.dev/videos",
                 headers=headers,
-                json={"q": video_query, "num": 5} # Fetch a bit extra, filter to 3
+                json={"q": video_query, "num": 5}
             )
 
             if video_res.status_code == 200:
                 data = safe_json_response(video_res)
                 videos = data.get("videos", [])
 
-                # ENFORCE STRICT 3 VIDEO LIMIT
                 video_count = 0
                 for item in videos:
                     if video_count >= 3:
@@ -1025,18 +999,13 @@ async def sync_search_cache(
         )
 
 # ============================================================
-# TASK GENERATION ENDPOINT (NOW QUEUE-BASED!)
+# TASK GENERATION ENDPOINT
 # ============================================================
 
 @app.post("/generate-tasks")
 async def generate_tasks(req: TaskRequest):
-    """
-    Instantly accepts the request and drops it into the async queue.
-    Prevents frontend 504 timeouts and shields the user from 429 Quota errors.
-    """
     await task_queue.put(req)
     
-    # Shield the frontend: Return a clean 202-style accepted state immediately
     return {
         "status": "processing",
         "message": "Your task is being safely generated by the AI Engine. This might take a moment.",
@@ -1044,7 +1013,87 @@ async def generate_tasks(req: TaskRequest):
     }
 
 # ============================================================
-# CV GENERATION ENDPOINT (COACH KEMI)
+# REGENERATE TASK ENDPOINT (NEW)
+# ============================================================
+
+@app.post("/regenerate-task")
+async def regenerate_existing_task(req: RegenerateRequest):
+    """
+    Synchronous endpoint for regenerating a task in-place.
+    It creates a new brief and overwrites the existing row.
+    """
+    try:
+        SUPABASE_URL = os.getenv("SUPABASE_URL")
+        SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
+        
+        async with httpx.AsyncClient() as client:
+            # 1. Check if the task has already been regenerated
+            check_res = await client.get(
+                f"{SUPABASE_URL}/rest/v1/tasks?id=eq.{req.task_id}&select=is_regenerated",
+                headers={"apikey": SUPABASE_SERVICE_KEY, "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}"}
+            )
+            
+            if check_res.status_code == 200:
+                data = check_res.json()
+                if data and data[0].get("is_regenerated"):
+                    raise HTTPException(status_code=400, detail="This task has already been regenerated once.")
+
+        # 2. Generate a fresh brief (No Serper fetching needed, we keep the original resources to save time!)
+        task = await generate_with_retry(
+            generate_task,
+            user_name=req.user_name,
+            track=req.track,
+            deadline_display=req.deadline_display,
+            experience_level="",
+            difficulty="intermediate",
+            task_number=req.task_number,
+            user_city=None,
+            include_ethical_trap=False,
+            model=model,
+            include_video_brief=False 
+        )
+
+        # 3. Scrub the title dynamically
+        raw_title = task.get("title", "New Task")
+        if req.user_name and req.user_name.lower() in raw_title.lower():
+            raw_title = re.sub(rf"{re.escape(req.user_name)}\s*[:\-\|]*\s*", "", raw_title, flags=re.IGNORECASE)
+        if ":" in raw_title:
+            raw_title = raw_title.split(":")[-1]
+        clean_title = raw_title.strip()
+
+        # 4. Overwrite the task in the database
+        update_payload = {
+            "title": clean_title,
+            "brief_content": task.get("brief_content", task.get("brief", task.get("description", ""))),
+            "is_regenerated": True
+        }
+
+        async with httpx.AsyncClient() as client:
+            update_res = await client.patch(
+                f"{SUPABASE_URL}/rest/v1/tasks?id=eq.{req.task_id}",
+                headers={
+                    "apikey": SUPABASE_SERVICE_KEY,
+                    "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+                    "Content-Type": "application/json",
+                    "Prefer": "return=minimal"
+                },
+                json=update_payload
+            )
+            
+            if update_res.status_code >= 400:
+                logger.error(f"Failed to update task {req.task_id}: {update_res.text}")
+                raise Exception("Database update failed")
+
+        return {"status": "success", "message": "Task regenerated successfully"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"REGENERATE ERROR: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================
+# CV GENERATION ENDPOINT
 # ============================================================
 
 @app.post("/generate-cv")
@@ -1073,12 +1122,8 @@ async def generate_cv_endpoint(req: GenerateCVRequest):
 
 @app.post("/run-monday-task-release")
 async def run_monday_task_release(authorization: str = Header(None)):
-    """
-    Secure endpoint triggered by external cron job to run weekly updates.
-    """
     expected_secret = os.getenv("CRON_SECRET")
 
-    # Verify the secure token
     if not expected_secret or authorization != f"Bearer {expected_secret}":
         logger.warning("🚨 Unauthorized attempt to run the Monday Task Release Engine!")
         raise HTTPException(status_code=401, detail="Unauthorized Cron Execution")
@@ -1086,11 +1131,6 @@ async def run_monday_task_release(authorization: str = Header(None)):
     logger.info("⏰ Monday 8 AM Task Release Engine Triggered Successfully!")
 
     try:
-        # In the future, or right here, you'll import and call your progression 
-        # catch-up engine from curriculum.py to cycle through all eligible students.
-        # e.g., from app.curriculum import run_weekly_rollout
-        # await run_weekly_rollout()
-        
         return {
             "status": "success",
             "message": "Monday task rollout and catch-up logic executed securely."
@@ -1109,6 +1149,5 @@ async def startup_event():
     logger.info("✅ Gemini configured")
     logger.info("✅ Orchestrator ready")
     
-    # 🔥 Spin up the background worker to listen to the queue!
     asyncio.create_task(queue_worker())
     logger.info("✅ Queue Worker active")

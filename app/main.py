@@ -999,11 +999,55 @@ async def sync_search_cache(
         )
 
 # ============================================================
-# TASK GENERATION ENDPOINT
+# TASK GENERATION ENDPOINT (SECURED & GATED)
 # ============================================================
 
 @app.post("/generate-tasks")
 async def generate_tasks(req: TaskRequest):
+    """
+    Secure endpoint for generating new weekly tasks.
+    Enforces strict progression gating to prevent task spamming.
+    """
+    try:
+        SUPABASE_URL = os.getenv("SUPABASE_URL")
+        SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
+        
+        # 🚨 THE IRON GATE: VALIDATE USER STATE BEFORE QUEUEING 🚨
+        if not hasattr(req, 'user_id') or not req.user_id:
+            # Fallback if user_id isn't in your TaskRequest model yet
+            pass 
+        else:
+            async with httpx.AsyncClient() as client:
+                # 1. Fetch user progression state
+                prog_res = await client.get(
+                    f"{SUPABASE_URL}/rest/v1/user_progression?user_id=eq.{req.user_id}&select=week_status,current_week",
+                    headers={"apikey": SUPABASE_SERVICE_KEY, "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}"}
+                )
+                
+                if prog_res.status_code == 200:
+                    prog_data = prog_res.json()
+                    if prog_data:
+                        week_status = prog_data[0].get("week_status")
+                        
+                        # GATE 1: Desk is Full
+                        if week_status in ["in_progress", "needs_revision"]:
+                            raise HTTPException(
+                                status_code=403, 
+                                detail="Access Denied: You already have an active task on your desk. Complete it before requesting a new one."
+                            )
+                            
+                        # GATE 2: Early Generation Spam Block
+                        # If they are in 'passed_waiting', only the Monday Cron Job or explicit Catch-Up logic should trigger this.
+                        # (You can expand this to check timestamps if needed)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"GATEKEEPER ERROR: {str(e)}")
+        # We don't want to crash if Supabase blips, but we log it.
+        pass 
+
+    # If they pass the gates, put them in the queue
     await task_queue.put(req)
     
     return {

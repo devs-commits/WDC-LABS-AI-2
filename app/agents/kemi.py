@@ -2,6 +2,9 @@ import google.generativeai as genai
 from pathlib import Path
 from typing import Optional, List
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Load prompt from file
 PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "kemi.txt"
@@ -23,28 +26,33 @@ async def translate_to_cv_bullet(
 ) -> dict:
     """
     Translate a completed task into a professional CV bullet point.
+    Strictly strips away all simulator roleplay and email headers.
     """
     system_prompt = get_system_prompt()
     
     prompt = f"""
 {system_prompt}
 
+You are an elite, ruthless Executive Recruiter writing ATS-optimized resumes. 
+Your job is to extract ONLY the raw professional value from the provided texts and convert it into a single, high-impact resume bullet point.
+
 ---
-
-**TASK COMPLETED:**
+**INPUT DATA:**
 Title: {task_title}
-Description: {task_description}
+Task Brief: {task_description}
+User's Submission: {user_accomplishment}
 
-**WHAT THE USER DID:**
-{user_accomplishment}
+---
+**CRITICAL RULES (YOU MUST OBEY):**
+1. **NO ROLEPLAY:** You must completely strip away all simulator language, email headers, greetings, and character names (e.g., REMOVE "Dear Asaju", "Welcome to...", "Subject:", "From:", "Intern", "Mentor", "Emem", "Sola").
+2. **NO INSTRUCTIONS:** Never include fragments of the task instructions or raw requirements in the final bullet.
+3. **FORMAT:** Use the Harvard Resume Format: [Action Verb] + [Project/Task] + [Result/Impact/Method].
+4. **PERSPECTIVE:** Write in the third-person professional tone (e.g., "Engineered X by utilizing Y...", NOT "I engineered X...").
 
-Translate this into a professional CV bullet point that would impress recruiters.
-Use action verbs, quantify impact where possible, and highlight transferable skills.
-
-Respond with JSON:
+Respond with STRICT JSON matching this exact structure:
 {{
-    "skill_tag": "Technical category (e.g., 'SQL', 'Data Analysis', 'SEO')",
-    "bullet_point": "The professional CV-ready bullet point"
+    "skill_tag": "A single Technical category (e.g., 'React', 'Data Analysis', 'SEO')",
+    "bullet_point": "The highly polished, single-sentence CV-ready bullet point."
 }}
 """
 
@@ -52,18 +60,34 @@ Respond with JSON:
     
     try:
         text = response.text.strip()
+        # Strip markdown fences if present
         if text.startswith("```json"):
             text = text[7:]
         if text.startswith("```"):
             text = text[3:]
         if text.endswith("```"):
             text = text[:-3]
+            
+        data = json.loads(text.strip())
         
-        return json.loads(text.strip())
+        # 🚨 PYTHON SAFEGUARD: If she hallucinates email headers, we catch it here.
+        clean_bullet = data.get("bullet_point", "")
+        for banned_phrase in ["Dear ", "Subject:", "From:", "To:", "Intern", "Welcome"]:
+            if banned_phrase.lower() in clean_bullet.lower():
+                logger.warning(f"[KEMI] Blocked leaked roleplay text in CV output: {clean_bullet}")
+                clean_bullet = f"Successfully executed {task_title} according to project requirements."
+                break
+                
+        return {
+            "skill_tag": data.get("skill_tag", "Professional Skills"),
+            "bullet_point": clean_bullet
+        }
+        
     except json.JSONDecodeError:
+        logger.error(f"[KEMI] Failed to decode JSON for CV translation. Raw text: {response.text}")
         return {
             "skill_tag": "General",
-            "bullet_point": f"Successfully completed: {task_title}"
+            "bullet_point": f"Executed and delivered: {task_title}"
         }
 
 async def respond_to_message(
@@ -284,14 +308,15 @@ Tasks & Feedback:
 
 You are an elite Executive Recruiter writing a highly professional, ATS-optimized resume for this candidate based ONLY on their completed tasks. 
 
-**RULES FOR THE RESUME:**
-1. **Formatting**: Use strict Markdown. Use `#` for the Name, `###` for section headers.
-2. **Tone**: Confident, highly professional, action-oriented.
-3. **Bullet Points**: Use the "Harvard Resume Format" (Action Verb + Project/Task + Result/Impact). Infer the professional impact based on the Supervisor Feedback.
+**CRITICAL RULES FOR THE RESUME (YOU MUST OBEY):**
+1. **NO ROLEPLAY OR RAW EMAILS:** You must completely strip away all email greetings, internal simulation instructions, "Dear User" texts, and "Subject:" lines from the Tasks & Feedback data. Do NOT include them in the final output.
+2. **Formatting**: Use strict Markdown. Use `#` for the Name, `###` for section headers.
+3. **Tone**: Confident, highly professional, action-oriented.
+4. **Bullet Points**: Use the "Harvard Resume Format" (Action Verb + Project/Task + Result/Impact). Infer the professional impact based on the Supervisor Feedback.
 
 **REQUIRED STRUCTURE:**
 
-# [Candidate Name]
+# {user_name}
 **[Track Title e.g. Data Analyst / Cyber Security Specialist]**
 
 ---
@@ -303,8 +328,8 @@ You are an elite Executive Recruiter writing a highly professional, ATS-optimize
 (List 6-8 relevant skills as bullet points, derived from their tasks.)
 
 ### PROFESSIONAL EXPERIENCE
-**WDC Labs** | *Virtual {track.replace('-', ' ').title()} Intern*
-(Translate their tasks into 4-6 incredibly strong bullet points. Do not just list the task descriptions—reframe them as professional achievements. Example: "Engineered X by utilizing Y, resulting in Z (as verified by technical supervisor).")
+**WDC Labs** | *Virtual {track.replace('-', ' ').title()}*
+(Translate their tasks into 4-6 incredibly strong bullet points. Reframe them as professional achievements. Example: "Engineered X by utilizing Y, resulting in Z.")
 
 ### EDUCATION & CERTIFICATIONS
 * **WDC Labs Immersive Career Program** - Certificate of Completion

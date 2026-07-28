@@ -194,6 +194,10 @@ async def generate_task(
 
         CRITICAL REQUIREMENT for SOLA 2.0: The brief MUST explicitly ask the intern to submit a tangible file (.csv, .xlsx, .pdf, .docx, .py, or .sql) corresponding to their work so the Technical Lead can review it.
 
+        CRITICAL SUBMISSION INSTRUCTION: 
+        Under the 'Submission Requirement' section, you MUST strictly instruct the user to submit their work by uploading their file directly through the WDC Labs platform desk. 
+        NEVER ask the user to send an email. Tell them to use the upload portal provided on their dashboard.
+
         Also provide:
         "educational_resources": one good Google search query string.
 

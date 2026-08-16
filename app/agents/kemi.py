@@ -245,7 +245,6 @@ Respond with JSON:
     try:
         text = response.text.strip()
         
-        # Strip markdown fences if present
         if text.startswith("```json"):
             text = text[7:]
         if text.startswith("```"):
@@ -271,10 +270,13 @@ Respond with JSON:
             "evaluation": None
         }
 
+# 🔥 THE MASSIVE UPGRADE IS HERE: Full ATS-Optimized Resume Generation
 async def generate_full_resume(
     user_id: str,
     user_name: str,
     track: str,
+    level: str,           # 🔥 Newly Added Parameter
+    badges: List[str],    # 🔥 Newly Added Parameter
     start_date: Optional[str],
     end_date: Optional[str],
     tasks: List[dict],
@@ -296,45 +298,71 @@ async def generate_full_resume(
         fb = feedback_map.get(t_id, "Completed successfully.")
         
         history_text += f"- Task: {title}\n  Description: {desc}\n  Supervisor Feedback: {fb}\n\n"
+
+    # Safely handle badges if empty
+    badge_str = ", ".join(badges) if badges else "None"
+    clean_track = track.replace('-', ' ').replace('_', ' ').title()
         
     prompt = f"""
 {system_prompt}
 
 **CANDIDATE DATA:**
 Name: {user_name}
-Track: {track}
+Track: {clean_track}
+Current Rank/Level: {level}
+Earned Badges: {badge_str}
 Tasks & Feedback:
 {history_text}
 
-You are an elite Executive Recruiter writing a highly professional, ATS-optimized resume for this candidate based ONLY on their completed tasks. 
+You are an expert ATS Resume Writer and Executive Coach at WDC Labs. Your job is to transform raw internship data into a highly professional, top-tier corporate resume.
 
 **CRITICAL RULES FOR THE RESUME (YOU MUST OBEY):**
-1. **NO ROLEPLAY OR RAW EMAILS:** You must completely strip away all email greetings, internal simulation instructions, "Dear User" texts, and "Subject:" lines from the Tasks & Feedback data. Do NOT include them in the final output.
-2. **Formatting**: Use strict Markdown. Use `#` for the Name, `###` for section headers.
-3. **Tone**: Confident, highly professional, action-oriented.
-4. **Bullet Points**: Use the "Harvard Resume Format" (Action Verb + Project/Task + Result/Impact). Infer the professional impact based on the Supervisor Feedback.
+1. **SYNTHESIZE, DO NOT LIST:** Do not list every single task. Combine completed tasks into 4-5 powerful bullet points outlining core responsibilities and real-world achievements.
+2. **TRANSLATE BADGES:** Do not list badge names verbatim (e.g., "Spreadsheet Survivor"). Translate them into professional competencies (e.g., "Advanced Data Cleaning") in the skills section.
+3. **NO ROLEPLAY OR RAW EMAILS:** You must completely strip away all email greetings, internal simulation instructions, "Dear User" texts, and "Subject:" lines from the Tasks & Feedback data.
+4. **FORMATTING**: Use strict Markdown. NO markdown code blocks (```). Just the raw text. Use `#` for the Name, `###` for section headers.
+5. **BULLET POINTS**: Use the "Harvard Resume Format" (Action Verb + Project/Task + Result/Impact).
 
 **REQUIRED STRUCTURE:**
 
 # {user_name}
-**[Track Title e.g. Data Analyst / Cyber Security Specialist]**
-
----
+## {clean_track} Professional | Current Rank: {level}
 
 ### PROFESSIONAL SUMMARY
-(Write a compelling 3-sentence summary highlighting their practical experience, number of completed simulations, and technical capabilities proven in WDC Labs.)
-
-### TECHNICAL & CORE COMPETENCIES
-(List 6-8 relevant skills as bullet points, derived from their tasks.)
+(A hard-hitting, 3-sentence summary of their skills, focusing on their readiness for full-time roles based on their trajectory and rank.)
 
 ### PROFESSIONAL EXPERIENCE
-**WDC Labs** | *Virtual {track.replace('-', ' ').title()}*
-(Translate their tasks into 4-6 incredibly strong bullet points. Reframe them as professional achievements. Example: "Engineered X by utilizing Y, resulting in Z.")
+**WDC Labs** | Remote
+*Virtual {clean_track} Intern* | {start_date or "Present"} - {end_date or "Present"}
+- [Action Verb] [Skill/Tool used] to [Outcome/Deliverable achieved]. (Combine multiple tasks here).
+- [Action Verb] [Skill/Tool used] to [Outcome/Deliverable achieved].
+- [Action Verb] [Skill/Tool used] to [Outcome/Deliverable achieved].
+- Consistently delivered high-quality work, noted by technical leads for [insert positive highlight from feedback].
 
-### EDUCATION & CERTIFICATIONS
-* **WDC Labs Immersive Career Program** - Certificate of Completion
-* *[Add your personal Education here]*
+### KEY PROJECTS (Highlight Top 2 Only)
+- **[Project Name]:** 1-2 sentences describing the most complex task completed and the tools used.
+- **[Project Name]:** 1-2 sentences describing their second best task.
+
+### CORE COMPETENCIES & EXPERTISE
+- **Technical Skills:** [Translate tasks into concrete technical skills. Comma separated]
+- **Tools Used:** [Comma separated list derived from tasks]
+- **Professional Strengths:** [Translate their earned Badges and feedback into soft/professional skills.]
+
+### CERTIFICATION & TRAINING
+**WDC Labs Industry Simulation Program**
+- **Pace & Volume:** Successfully executed {len(tasks)} rigorous, industry-standard technical tasks under strict deadlines.
+- **Performance Summary:** Maintained a standard of excellence, consistently passing AI-graded technical reviews, demonstrating rapid skill acquisition, and operating with high autonomy.
 """
 
     response = await model.generate_content_async(prompt)
-    return response.text
+    
+    # Strip accidental code blocks from output just in case
+    output = response.text.strip()
+    if output.startswith("```markdown"):
+        output = output[11:]
+    elif output.startswith("```"):
+        output = output[3:]
+    if output.endswith("```"):
+        output = output[:-3]
+        
+    return output.strip()

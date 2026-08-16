@@ -169,147 +169,116 @@ def get_curriculum_step(track: str, task_number: int):
 # PROGRESSION & BADGE ENGINE (UPDATED FOR GRADING GATE)
 # ============================================================
 
-def process_task_completion(supabase_client, user_id, track: str, current_week: int, score: int, attempt_number: int = 1):
+def process_task_completion(supabase_client, user_id, track: str, current_week: int, score: int, attempt_number: int = 1, score_breakdown: dict = None):
     """
-    Evaluates the student's score, awards badges, and executes Catch-Up logic
-    if the student is behind the global timeline.
+    Evaluates the student's score, awards badges, updates task scores, and executes Catch-Up logic.
     """
+    if score_breakdown is None:
+        score_breakdown = {}
+        
     track_key = track.lower().replace(" ", "_").replace("-", "_")
     
     # 🔥 THE FAIL-FORWARD FIX: Automatically pass on 3rd attempt regardless of score
     passed = (score >= 50) or (attempt_number >= 3)
 
-    # Check if a badge is earned for this week
     curriculum_step = CURRICULUM.get(track_key, {}).get(current_week, {})
     badge_to_award = curriculum_step.get("badge_opportunity")
+
+    # 1. Update the actual Task record so the UI can read the score transparently
+    try:
+        # 🔥 THE FIX: Added .eq("week", current_week) so it only updates the specific task!
+        supabase_client.table("tasks").update({
+            "score": score,
+            "score_breakdown": score_breakdown,
+            "status": "passed" if passed else "needs_revision",
+            "completed": passed
+        }).eq("user", user_id).eq("task_track", track).eq("week", current_week).execute()
+        
+    except Exception as e:
+        print(f"Failed to update task scoring records: {e}")
+
+    # 2. Safely Fetch Current Progression Stats
+    prog_response = supabase_client.table("user_progression").select("*").eq("user_id", user_id).execute()
+    existing_prog = prog_response.data[0] if prog_response.data else {}
+    
+    exc_count = existing_prog.get("excellent_count", 0)
+    gd_count = existing_prog.get("good_count", 0)
+    pass_count = existing_prog.get("pass_count", 0)
 
     if passed:
         print(f"✅ User {user_id} scored {score} (Attempt {attempt_number}). Evaluating progression timeline...")
 
-        # ==================================================
-        # FETCH USER START DATE
-        # ==================================================
-        prog_response = (
-            supabase_client
-            .table("user_progression")
-            .select("created_at")
-            .eq("user_id", user_id)
-            .execute()
-        )
+        # Dynamically bump the correct score bucket
+        if score >= 85: exc_count += 1
+        elif score >= 70: gd_count += 1
+        else: pass_count += 1
 
+        # Calculate Expected Week based on active days
         expected_week = current_week
-
-        if prog_response.data:
-            try:
-                created_at_str = prog_response.data[0]["created_at"]
-                created_at = parser.isoparse(created_at_str).replace(tzinfo=None)
-
-                days_active = (
-                    datetime.datetime.utcnow() - created_at
-                ).days
-
-                expected_week = (days_active // 7) + 1
-
-                print(
-                    f"📅 User active for {days_active} days. "
-                    f"Expected Week: {expected_week}"
-                )
-
-            except Exception as e:
-                print(f"⚠️ Expected week calculation failed: {e}")
+        try:
+            created_at_str = existing_prog.get("created_at", datetime.datetime.utcnow().isoformat())
+            created_at = parser.isoparse(created_at_str).replace(tzinfo=None)
+            days_active = (datetime.datetime.utcnow() - created_at).days
+            expected_week = (days_active // 7) + 1
+        except Exception as e:
+            print(f"⚠️ Expected week calculation failed: {e}")
 
         # ==================================================
         # CATCH-UP ENGINE
         # ==================================================
         if expected_week > current_week and current_week < 24:
-
             next_week = current_week + 1
             new_identity = get_identity_for_week(track_key, next_week)
-
+            
             progression_data = {
                 "user_id": user_id,
                 "current_week": next_week,
                 "current_identity": new_identity,
                 "week_status": "in_progress",
+                "excellent_count": exc_count,
+                "good_count": gd_count,
+                "pass_count": pass_count,
                 "updated_at": datetime.datetime.utcnow().isoformat()
             }
-
-            supabase_client.table(
-                "user_progression"
-            ).upsert(progression_data).execute()
-
-            print(
-                f"⚡ CATCH-UP TRIGGERED! "
-                f"User {user_id} progressed to Week {next_week}."
-            )
+            supabase_client.table("user_progression").upsert(progression_data).execute()
+            print(f"⚡ CATCH-UP TRIGGERED! User {user_id} progressed to Week {next_week}.")
 
         else:
-
-            new_identity = get_identity_for_week(
-                track_key,
-                current_week
-            )
-
+            new_identity = get_identity_for_week(track_key, current_week)
             progression_data = {
                 "user_id": user_id,
                 "current_week": current_week,
                 "current_identity": new_identity,
                 "week_status": "passed_waiting",
+                "excellent_count": exc_count,
+                "good_count": gd_count,
+                "pass_count": pass_count,
                 "updated_at": datetime.datetime.utcnow().isoformat()
             }
+            supabase_client.table("user_progression").upsert(progression_data).execute()
+            print(f"🔒 User {user_id} is on schedule. Marked as 'passed_waiting'.")
 
-            supabase_client.table(
-                "user_progression"
-            ).upsert(progression_data).execute()
-
-            print(
-                f"🔒 User {user_id} is on schedule. "
-                f"Marked as 'passed_waiting'."
-            )
-
-        # ==================================================
         # BADGE AWARDS
-        # ==================================================
         if badge_to_award:
-
             badge_data = {
                 "user_id": user_id,
                 "badge_name": badge_to_award,
                 "earned_in_week": current_week
             }
-
             try:
-                supabase_client.table(
-                    "user_badges"
-                ).insert(badge_data).execute()
-
-                print(
-                    f"🎉 Successfully awarded "
-                    f"'{badge_to_award}' badge to user {user_id}!"
-                )
-
+                supabase_client.table("user_badges").insert(badge_data).execute()
+                print(f"🎉 Successfully awarded '{badge_to_award}' badge to user {user_id}!")
             except Exception as e:
-                print(
-                    f"Badge '{badge_to_award}' already exists "
-                    f"or an error occurred: {e}"
-                )
+                print(f"Badge '{badge_to_award}' already exists or an error occurred: {e}")
 
     else:
-
         progression_data = {
             "user_id": user_id,
             "current_week": current_week,
             "week_status": "needs_revision",
             "updated_at": datetime.datetime.utcnow().isoformat()
         }
-
-        supabase_client.table(
-            "user_progression"
-        ).upsert(progression_data).execute()
-
-        print(
-            f"❌ User {user_id} scored {score} (<50). "
-            f"Marked as 'needs_revision'."
-        )
+        supabase_client.table("user_progression").upsert(progression_data).execute()
+        print(f"❌ User {user_id} scored {score} (<50). Marked as 'needs_revision'.")
 
     return passed

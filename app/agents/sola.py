@@ -43,22 +43,19 @@ async def review_submission(
     """
     system_prompt = get_system_prompt()
     
-    # Expand truncation drastically for Gemini 1.5 Pro to ingest full documents
     submission_preview = submission_content[:15000] if len(submission_content) > 15000 else submission_content
     
     # ==========================================
-    # 🔥 BULLETPROOF FAIL-SAFE FALLBACK
+    # 🔥 BULLETPROOF FAIL-SAFE FALLBACK (ADDED BREAKDOWN)
     # ==========================================
     fallback_result = {
         "feedback": "We experienced a system interruption while reviewing your work. Please double-check your submission and try again.",
         "passed": False,
         "score": 0,
+        "score_breakdown": {},
         "error_tag": "[ERR_SYSTEM]"
     }
     
-    # ==========================================
-    # EVALUATION RULES (FORMATTING & 3-STRIKE)
-    # ==========================================
     if attempt_number >= 3:
         attempt_context = """
         🚨 CRITICAL RULE: This is the user's 3rd and FINAL attempt for the day. 
@@ -106,10 +103,10 @@ async def review_submission(
     RULES:
     1. Focus on major blockers; structure feedback exactly as: Positive, Pivot, Why, Badge Verdict, Tag, Encouragement.
     2. Determine the numerical score (0-100).
-    3. Set 'passed' to true ONLY if the score is 50 or higher. Set to false if below 50.
+    3. Generate a strict JSON object mapping specific scoring criteria to their values out of the total.
     
     Respond ONLY with valid JSON on a single line (no markdown blocks around the JSON):
-    {{"feedback": "Your beautifully formatted, spaced-out coaching message", "passed": true_or_false, "score": integer_0_to_100, "error_tag": "[ERR_TAG]"}}
+    {{"feedback": "Your beautifully formatted message", "passed": true_or_false, "score": integer_0_to_100, "score_breakdown": {{"Technical Accuracy": "X/40", "Communication": "X/30", "Delivery": "X/30"}}, "error_tag": "[ERR_TAG]"}}
     """
 
     prompt = f"""
@@ -138,7 +135,6 @@ Badge Opportunity: {badge_opportunity or "None"}
         response = await model.generate_content_async(prompt)
         text = response.text.strip()
         
-        # Clean markdown code blocks from response
         if text.startswith("```"):
             lines = text.split('\n')
             if len(lines) > 1:
@@ -148,38 +144,18 @@ Badge Opportunity: {badge_opportunity or "None"}
 
         json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', text, re.DOTALL)
         
+        # Helper to normalize the result cleanly
+        def process_json_result(raw_json_str):
+            res = json.loads(raw_json_str)
+            res["score"] = int(res.get("score", 50))
+            res["passed"] = res["score"] >= 50
+            res["score_breakdown"] = res.get("score_breakdown", {})
+            return res
+
         if json_match:
-            json_str = json_match.group(0)
-            result = json.loads(json_str)
-            if isinstance(result, dict) and "feedback" in result and "passed" in result:
-                if "score" not in result:
-                    result["score"] = 50
-                    
-                # ==========================================
-                # 🔥 STRICT SCORE-TO-PASS LOGIC (NO FREE PASSES)
-                # ==========================================
-                if result["score"] < 50:
-                    result["passed"] = False
-                else:
-                    result["passed"] = True
-                    
-                return result
-        
-        # Fallback parsing
-        result = json.loads(text)
-        if isinstance(result, dict) and "feedback" in result and "passed" in result:
-            if "score" not in result:
-                result["score"] = 50
-                
-            # ==========================================
-            # 🔥 STRICT SCORE-TO-PASS LOGIC (NO FREE PASSES)
-            # ==========================================
-            if result["score"] < 50:
-                result["passed"] = False
-            else:
-                result["passed"] = True
-                
-            return result
+            return process_json_result(json_match.group(0))
+            
+        return process_json_result(text)
             
     except Exception as e:
         print(f"[SOLA ERROR] System or parsing failure: {e}")

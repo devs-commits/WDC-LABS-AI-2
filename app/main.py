@@ -1036,9 +1036,12 @@ async def generate_tasks(req: TaskRequest):
                                 detail="Access Denied: You already have an active task on your desk. Complete it before requesting a new one."
                             )
                             
-                        # GATE 2: Early Generation Spam Block
-                        # If they are in 'passed_waiting', only the Monday Cron Job or explicit Catch-Up logic should trigger this.
-                        # (You can expand this to check timestamps if needed)
+                        # GATE 2: Early Generation Spam Block (The Weekend Lock)
+                        elif week_status == "passed_waiting":
+                            raise HTTPException(
+                                status_code=403,
+                                detail="Access Denied: You have successfully completed your task for this week. Your next brief will automatically unlock on Monday."
+                            )
 
     except HTTPException:
         raise

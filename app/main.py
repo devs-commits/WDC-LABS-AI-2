@@ -811,6 +811,7 @@ class TaskRequest(BaseModel):
     include_ethical_trap: Optional[bool] = False
     include_video_brief: Optional[bool] = True
     previous_performance: Optional[str] = "N/A"
+    is_admin_override: Optional[bool] = False
 
 class GenerateCVRequest(BaseModel):
     user_id: str
@@ -1014,8 +1015,14 @@ async def generate_tasks(req: TaskRequest):
         
         # 🚨 THE IRON GATE: VALIDATE USER STATE BEFORE QUEUEING 🚨
         if not hasattr(req, 'user_id') or not req.user_id:
-            # Fallback if user_id isn't in your TaskRequest model yet
+            # SHUT THE LOOPHOLE: Do not 'pass', block it.
+            raise HTTPException(status_code=400, detail="Access Denied: Missing User ID.")
+            
+        # 🔥 NEW: If an Admin is forcing this, skip the progression locks entirely!
+        elif req.is_admin_override:
+            logger.info(f"🛡️ Admin Override Active: Bypassing progression gates for {req.user_name}")
             pass 
+            
         else:
             async with httpx.AsyncClient() as client:
                 # 1. Fetch user progression state
@@ -1026,15 +1033,34 @@ async def generate_tasks(req: TaskRequest):
                 
                 if prog_res.status_code == 200:
                     prog_data = prog_res.json()
-                    if prog_data:
-                        week_status = prog_data[0].get("week_status")
-                        
-                        # GATE 1: Desk is Full
-                        if week_status in ["in_progress", "needs_revision"]:
+                    
+                    # SHUT THE LOOPHOLE: If they don't have a progression row yet, ensure their desk is empty.
+                    if not prog_data:
+                        task_check = await client.get(
+                            f"{SUPABASE_URL}/rest/v1/tasks?user=eq.{req.user_id}&select=id",
+                            headers={"apikey": SUPABASE_SERVICE_KEY, "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}"}
+                        )
+                        if task_check.status_code == 200 and len(task_check.json()) > 0:
                             raise HTTPException(
                                 status_code=403, 
-                                detail="Access Denied: You already have an active task on your desk. Complete it before requesting a new one."
+                                detail="Access Denied: You already have a task assigned. Please complete it first."
                             )
+                    else:
+                        week_status = prog_data[0].get("week_status")
+                        
+                        # GATE 1: Desk is Full (With Glitch Recovery)
+                        if week_status in ["in_progress", "needs_revision"]:
+                            # Verify if they ACTUALLY have a pending task on their desk
+                            task_check = await client.get(
+                                f"{SUPABASE_URL}/rest/v1/tasks?user=eq.{req.user_id}&status=in.(pending,submitted,under_review,needs_revision)",
+                                headers={"apikey": SUPABASE_SERVICE_KEY, "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}"}
+                            )
+                            if task_check.status_code == 200 and len(task_check.json()) > 0:
+                                raise HTTPException(
+                                    status_code=403, 
+                                    detail="Access Denied: You already have an active task on your desk. Complete it before requesting a new one."
+                                )
+                            # If len == 0, their desk is genuinely empty due to a glitch. Let them pass!
                             
                         # GATE 2: Early Generation Spam Block (The Weekend Lock)
                         elif week_status == "passed_waiting":
@@ -1047,7 +1073,6 @@ async def generate_tasks(req: TaskRequest):
         raise
     except Exception as e:
         logger.error(f"GATEKEEPER ERROR: {str(e)}")
-        # We don't want to crash if Supabase blips, but we log it.
         pass 
 
     # If they pass the gates, put them in the queue

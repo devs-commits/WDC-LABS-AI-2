@@ -26,6 +26,11 @@ TASK DESIGN RULES
 - CRITICAL: DO NOT use template placeholders like "[Insert Current Date]", "[Company Name]", or "[Insert Deadline]". Omit dates entirely. 
 - Focus on action and deliverables.
 
+CRITICAL DATA RULE
+You do NOT have the ability to attach CSVs, Excel files, or external datasets. 
+NEVER write phrases like "Check the attached data" or "Analyze the attached file." 
+If the task requires the intern to analyze data, YOU MUST GENERATE a small, realistic dataset formatted as a Markdown Table directly inside the Task Description so they can see it and copy it.
+
 LENGTH CONSTRAINT (VERY IMPORTANT)
 - Total brief length: 80–120 words.
 - Short paragraphs or bullet points allowed.

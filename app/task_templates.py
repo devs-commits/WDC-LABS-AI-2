@@ -192,6 +192,8 @@ async def generate_task(
         Key Concepts: {', '.join(curriculum['key_concepts'])}
         Company: {company} in {city}
 
+        DEADLINE INSTRUCTION: The strict deadline is {deadline_display}. You MUST weave this exact deadline date and time naturally into the brief introduction.
+
         CRITICAL REQUIREMENT for SOLA 2.0: The brief MUST explicitly ask the intern to submit a tangible file (.csv, .xlsx, .pdf, .docx, .py, or .sql) corresponding to their work so the Technical Lead can review it.
 
         CRITICAL SUBMISSION INSTRUCTION: 
@@ -237,6 +239,7 @@ async def generate_task(
             anomaly_count=random.randint(2, 5),
             error_cause=random.choice(error_causes)
         )
+        brief += f"\n\n**Deadline:** {deadline_display}"
         search_query = f"{track} tutorial for beginners"
 
     # -----------------------------
@@ -250,11 +253,12 @@ async def generate_task(
     # -----------------------------
     # Deadline
     # -----------------------------
-    deadline = now + timedelta(days=1)
-    while deadline.weekday() >= 5:
-        deadline += timedelta(days=1)
-
-    deadline_display = format_deadline_display(deadline.isoformat())
+    deadline = now + timedelta(days=7) # Internal DB fallback timestamp
+    if not deadline_display or deadline_display == "Flexible":
+        calc_deadline = now + timedelta(days=1)
+        while calc_deadline.weekday() >= 5:
+            calc_deadline += timedelta(days=1)
+        deadline_display = format_deadline_display(calc_deadline.isoformat())
 
     # -----------------------------
     # CACHED SERPER SEARCH

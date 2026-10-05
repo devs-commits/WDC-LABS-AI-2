@@ -4,6 +4,7 @@ print("🚀 RUNNING THIS MAIN FILE:", __file__)
 WDC Labs AI Backend
 Production-Grade FastAPI Backend
 Immersive Virtual Office AI System
+Updated for 5-Day + Reality Task Framework
 """
 
 # ============================================================
@@ -18,6 +19,7 @@ import mimetypes
 import asyncio
 import logging
 import time
+from datetime import datetime, timedelta
 
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -165,6 +167,91 @@ ALLOWED_FILE_HOSTS = [
 ]
 
 # ============================================================
+# BACKEND SYLLABUS KNOWLEDGE BASE
+# ============================================================
+
+TRACK_SYLLABUS = {
+  "data-analytics": [
+    { "topic": "Intro to Data Analytics", "days": ["What is Data Analytics?", "The Data Life Cycle", "Key Metrics & KPIs", "Data Privacy & Ethics", "Dataset Exploration", "Reality Task: Analyze sales records"] },
+    { "topic": "Excel Basics", "days": ["Interface & Navigation", "Data Entry & Cleanup", "Sorting & Multi-level Filtering", "Cell Referencing", "Data Validation", "Reality Task: Clean employee records"] },
+    { "topic": "Excel Functions & Formulas", "days": ["Basic Aggregations", "Text Functions", "Logical Functions", "Conditional Sums", "Lookup Functions", "Reality Task: Fix customer data"] },
+    { "topic": "Data Visualization in Excel", "days": ["Chart Principles", "Chart Formatting", "Pivot Tables Basics", "Pivot Charts & Slicers", "Dashboard Layout", "Reality Task: Create sales dashboard"] },
+    { "topic": "Power Query & Data Cleaning", "days": ["Intro to Power Query", "Connecting Data", "Transformations", "Merging & Appending", "Data Types & Errors", "Reality Task: Import messy sales files"] },
+    { "topic": "Excel Business Project", "days": ["Project Scoping", "Data Cleaning & Audit", "Data Analysis", "Dashboard Build", "Insight Generation", "Reality Task: Analyze retail data"] },
+    { "topic": "SQL Basics", "days": ["Intro to RDBMS & SQL", "Data Retrieval", "Filtering Data", "Sorting Results", "SQL Practice", "Reality Task: Retrieve customer orders"] },
+    { "topic": "SQL Joins & Aggregation", "days": ["Aggregation Functions", "Grouping Data", "SQL Joins 1 (Inner/Left)", "SQL Joins 2 (Right/Full)", "Multi-Table Joins", "Reality Task: Top-performing products"] },
+    { "topic": "Intermediate SQL Analysis", "days": ["Subqueries", "Common Table Expressions (CTEs)", "String & Date Functions", "Conditional Logic (CASE)", "Performance Optimization", "Reality Task: Declining sales trends"] },
+    { "topic": "Power BI Fundamentals", "days": ["Intro to Power BI Desktop", "Data Ingestion", "Star Schema Data Modeling", "Basic Visuals", "Visual Interactivity", "Reality Task: Build KPI cards"] },
+    { "topic": "Power BI Dashboards & DAX", "days": ["Intro to DAX", "Essential DAX Functions", "The CALCULATE Function", "Time Intelligence in DAX", "Executive Dashboard Formatting", "Reality Task: MoM growth trends"] },
+    { "topic": "Portfolio + Analyst Defense", "days": ["Portfolio Setup", "Executive Summaries", "Presentation Deck Creation", "Q&A Prep", "Final Rehearsal", "Reality Task: Present business insights"] },
+    { "topic": "Python for Data Analytics", "days": ["Intro to Python & Jupyter", "Python Control Structures", "Intro to Pandas", "Loading Datasets", "Data Inspection", "Reality Task: Load and clean CSV files"] },
+    { "topic": "Data Manipulation with Pandas", "days": ["Filtering Data", "Data Cleaning", "Aggregations", "Merging Data", "Feature Engineering", "Reality Task: Regional sales performance"] },
+    { "topic": "Python Visualization", "days": ["Intro to Matplotlib", "Intro to Seaborn", "Customizing Visuals", "Visualizing Distributions", "Multi-plot Grids", "Reality Task: Ad spend vs sales"] },
+    { "topic": "Working with Big Data Files", "days": ["Memory Management", "Optimized File Formats", "Vectorization", "Large Dataset Filtering", "Out-of-Memory Workflows", "Reality Task: Analyze 2GB transaction file"] },
+    { "topic": "Statistical Analysis", "days": ["Central Tendency & Dispersion", "Probability Distributions", "Correlation vs Causation", "Hypothesis Testing", "Churn Analysis Drivers", "Reality Task: Factor influencing churn"] },
+    { "topic": "Advanced Power BI & DAX", "days": ["Dynamic Parameters", "Advanced DAX", "Row-Level Security (RLS)", "Performance Analyzer", "Dashboard UX/UI", "Reality Task: Dynamic executive dashboard"] },
+    { "topic": "Business Reporting & Communication", "days": ["Storytelling Frameworks", "Eliminating Noise", "Writing for C-Suite", "Slide Deck Design", "Presenting Uncertainties", "Reality Task: Boardroom-ready report"] },
+    { "topic": "Analytics Automation", "days": ["Automation Architecture", "Python Scripting", "Power BI Gateway", "Email Alerts", "Workflow Debugging", "Reality Task: Automate weekly reporting"] },
+    { "topic": "Predictive Analytics Foundations", "days": ["Time Series Basics", "Moving Averages", "Linear Regression Intro", "Evaluating Forecasts", "Scenario Analysis", "Reality Task: Predict sales performance"] },
+    { "topic": "Cross-Department Data Analysis", "days": ["Multi-Department Metrics", "Customer Journey Mapping", "Data Reconciliation", "Cohort Analysis", "Cross-Department Dashboards", "Reality Task: Identify revenue leakage"] },
+    { "topic": "Real-World Data Crisis Simulation", "days": ["Diagnostic Analytics", "Finding Broken Pipelines", "Fast Data Patching", "Stakeholder Management", "Root Cause Analysis", "Reality Task: Fix broken reports"] },
+    { "topic": "Boardroom Defense & Strategic Analytics", "days": ["12-Month Analytics Roadmap", "Estimating Analytics ROI", "Final Executive Presentation", "Mock Defense", "Final Polish", "Reality Task: Present 12-month strategy"] }
+  ],
+  "digital-marketing": [
+    { "topic": "Intro to Digital Marketing", "days": ["The Digital Ecosystem", "Business Growth Models", "Key Digital Metrics", "Competitor Research", "Marketing Audit Setup", "Reality Task: Analyze local business"] },
+    { "topic": "Customer Journey & Psychology", "days": ["Consumer Psychology", "The Marketing Funnel", "The 3i Principles", "Buyer Personas", "Touchpoint Mapping", "Reality Task: Map fintech journey"] },
+    { "topic": "Content & Social Media Basics", "days": ["Platform Mechanics", "Hook Writing", "Content Pillars", "Content Scheduling", "Community Engagement", "Reality Task: 1-week Instagram plan"] },
+    { "topic": "SEO & Search Fundamentals", "days": ["How Search Engines Work", "Keyword Research", "On-Page SEO 1", "On-Page SEO 2", "SEO Audit Tools", "Reality Task: Audit website and optimize"] },
+    { "topic": "Meta Ads Fundamentals", "days": ["Meta Business Suite Setup", "Campaign Hierarchy", "Audience Targeting", "Budgeting & Scheduling", "Ad Setup", "Reality Task: Meta Ads campaign"] },
+    { "topic": "Google Ads & PPC", "days": ["Intro to PPC & Search Ads", "Match Types", "Ad Copywriting", "Ad Extensions (Assets)", "Bidding Strategies", "Reality Task: Launch Google Ads"] },
+    { "topic": "Creatives & Landing Pages", "days": ["Direct Response Copywriting", "Visual Design Principles", "Landing Page Essentials", "Call to Actions (CTAs)", "Landing Page Wireframing", "Reality Task: Redesign ad creatives"] },
+    { "topic": "Email & Mobile Marketing", "days": ["Lifecycle Marketing", "Email Copywriting", "Onboarding Sequences", "Mobile Marketing", "Email Deliverability", "Reality Task: 5-email onboarding flow"] },
+    { "topic": "Analytics & Tracking", "days": ["Web Analytics Intro", "Pixel & Conversion Setup", "UTM Parameters", "Attribution Models", "Diagnostic Analytics", "Reality Task: Diagnose GA4 report"] },
+    { "topic": "Media Planning & Strategy", "days": ["Budget Allocation", "Forecasting KPIs", "Channel Mix Strategy", "Campaign Timelines", "Media Plan Assembly", "Reality Task: 6-month media plan"] },
+    { "topic": "Campaign Optimization", "days": ["Performance Auditing", "A/B Testing Framework", "Fixing ROAS", "Bidding Adjustments", "Emergency Rescue Tactics", "Reality Task: Fix underperforming campaigns"] },
+    { "topic": "Portfolio + Boardroom Defense", "days": ["Portfolio Structuring", "Reporting Frameworks", "Case Study Writing", "Objections & Defense", "Mock Pitch", "Reality Task: Present campaign results"] },
+    { "topic": "Advanced Meta Ads", "days": ["Campaign Budget Optimization", "High-Budget Scaling", "Advanced Retargeting", "Dynamic Product Ads", "Creative Fatigue System", "Reality Task: Scale winning campaign"] },
+    { "topic": "Advanced Google Ads", "days": ["Performance Max (PMAX)", "YouTube Ads", "Display & Remarketing", "Search Term Cleanups", "Smart Bidding", "Reality Task: Fix wasting spend"] },
+    { "topic": "Conversion Rate Optimization (CRO)", "days": ["Heatmap Analysis", "User Friction Audits", "Copy & Value Proposition Testing", "Checkout Optimization", "A/B Test Execution", "Reality Task: Increase conversion rate"] },
+    { "topic": "Full Funnel Systems", "days": ["Multi-Touch Funnels", "Cross-Channel Synchronization", "Offer Architecture", "Measurement Architecture", "Funnel Mapping", "Reality Task: Build acquisition funnel"] },
+    { "topic": "Advanced Analytics", "days": ["Cohort Analysis", "CAC & LTV Economics", "Multi-Touch Attribution", "Unit Economics Debugging", "Strategic Analytics Reporting", "Reality Task: Identify CAC increase"] },
+    { "topic": "Marketing Automation", "days": ["CRM Architectures", "Lead Scoring", "Automated Workflows", "Webhook Integrations", "Automation Testing", "Reality Task: Automated lead nurturing"] },
+    { "topic": "Growth Marketing Systems", "days": ["Pirate Metrics (AARRR)", "Experimentation Frameworks", "Activation Rate Optimization", "Viral Loops & Referral Systems", "Growth Sprints", "Reality Task: Improve activation by 25%"] },
+    { "topic": "AI in Marketing", "days": ["Generative AI for Copy", "AI Visual Generation", "Audience Research with AI", "Automated Reporting", "AI Workflow Integration", "Reality Task: AI-assisted workflows"] },
+    { "topic": "Crisis & Reputation Management", "days": ["Social Listening Setup", "Crisis Classification", "Statement Drafting", "De-escalation Frameworks", "24-Hour Recovery Playbook", "Reality Task: 24-hour response strategy"] },
+    { "topic": "Client & Stakeholder Management", "days": ["Managing Expectations", "Difficult Conversations", "Value-Based Upselling", "Client Reporting Meetings", "SLA & Scope Defense", "Reality Task: Defend delayed results"] },
+    { "topic": "Agency Simulation", "days": ["Multi-Client Management", "Resource Allocation", "Emergency Priority Shifts", "Team Workflows", "Account Health Checks", "Reality Task: Manage 3 campaigns"] },
+    { "topic": "Executive Boardroom Defense", "days": ["12-Month Growth Roadmap", "Executive Financial Modeling", "Presentation Mastery", "Live Board Defense Prep", "Strategy Polish", "Reality Task: Defend growth strategy"] }
+  ],
+  "cyber-security": [
+    { "topic": "Intro to Cybersecurity", "days": ["Core Pillars (CIA Triad)", "Threat Landscape", "Threat Actors", "Attack Vectors", "Business Risk", "Reality Task: Phishing compromise"] },
+    { "topic": "Linux & Command Line Basics", "days": ["Intro to Linux OS", "File Operations", "Text Processing", "Permissions & Ownership", "System Management", "Reality Task: Navigate server directories"] },
+    { "topic": "Networking Fundamentals", "days": ["Networking Models (OSI)", "IP Addressing & Subnetting", "Core Protocols", "Network Traffic Analysis", "Network Tools", "Reality Task: Trace suspicious activity"] },
+    { "topic": "Security Fundamentals", "days": ["Authentication vs Authorization", "Access Control Models", "Principle of Least Privilege", "Identity Auditing", "Password Security", "Reality Task: Audit permissions"] },
+    { "topic": "Firewalls & Network Security", "days": ["Firewall Architecture", "Network Segmentation", "Firewall Rule Writing", "NACLs & Security Groups", "Traffic Auditing", "Reality Task: Block insecure traffic"] },
+    { "topic": "Threats & Vulnerabilities", "days": ["Attack Tactics", "Denial of Service (DoS)", "Vulnerability Management", "Log Analysis Basics", "Attack Identification", "Reality Task: Analyze brute-force logs"] },
+    { "topic": "Authentication & MFA", "days": ["Authentication Factors", "Multi-Factor Authentication", "SSO & Identity Protocols", "MFA Vulnerabilities", "Policy Enforcement", "Reality Task: Implement MFA rules"] },
+    { "topic": "Encryption & Cryptography", "days": ["Cryptography Concepts", "Hashing Functions", "Data States", "PKI & Certificates", "Integrity Verification", "Reality Task: Encrypt confidential files"] },
+    { "topic": "Monitoring & Incident Response", "days": ["Vulnerability Scanning", "Incident Response Lifecycle", "Log Aggregation", "Security Reporting", "Risk Prioritization", "Reality Task: Prepare security risk report"] },
+    { "topic": "Disaster Recovery Fundamentals", "days": ["BCP & Disaster Recovery", "Recovery Metrics", "Ransomware Mechanics", "Backup Strategies", "Incident Containment", "Reality Task: Respond to ransomware"] },
+    { "topic": "Security Reporting & Documentation", "days": ["Technical Documentation", "SOPs", "Executive Summaries", "Evidence Handling", "Portfolio Assembly", "Reality Task: Compile vulnerability report"] },
+    { "topic": "Boardroom Defense & Risk Communication", "days": ["Security ROI", "Presenting Risk Matrices", "Handling Pushback", "Slide Deck Design", "Defense Practice", "Reality Task: Present risk mitigation plan"] },
+    { "topic": "Advanced Network Security", "days": ["Intrusion Detection (IDS/IPS)", "Packet Capture Analysis", "Network Microsegmentation", "VPNs & Secure Proxies", "Suspicious Pattern Detection", "Reality Task: Isolate suspicious traffic"] },
+    { "topic": "Ethical Hacking Fundamentals", "days": ["Penetration Testing Phases", "Reconnaissance (OSINT)", "Web App Recon", "Exploitation Mechanics", "Remediation Verification", "Reality Task: Identify vulnerabilities"] },
+    { "topic": "Web Application Security", "days": ["OWASP Top 10 Intro", "Injection Attacks", "Cross-Site Scripting (XSS)", "Authentication Weaknesses", "Web App Patching", "Reality Task: Patch vulnerabilities"] },
+    { "topic": "Device & Endpoint Protection", "days": ["EDR vs Antivirus", "Malware Types", "Host Logs Auditing", "Persistence Mechanisms", "Malware Containment", "Reality Task: Investigate malware infection"] },
+    { "topic": "Cloud & Infrastructure Security", "days": ["Shared Responsibility Model", "Cloud Identity (IAM)", "Cloud Storage Security", "IaC Auditing", "Cloud Logging & Auditing", "Reality Task: Secure misconfigured bucket"] },
+    { "topic": "SOC Workflows & Threat Hunting", "days": ["SOC Operations", "Threat Hunting Basics", "SIEM Querying", "Correlation Rules", "False Positive Reduction", "Reality Task: Investigate suspicious logins"] },
+    { "topic": "Security Policies & Compliance", "days": ["Compliance Frameworks", "Data Privacy Regulations", "Security Policy Drafting", "Vendor Risk Management", "Compliance Incident Auditing", "Reality Task: Draft compliance response"] },
+    { "topic": "Security Automation & AI Risks", "days": ["SOAR principles", "Python Scripting for Defense", "Automated Alert Workflows", "AI Security Risks", "AI in Cyber Defense", "Reality Task: Automated alert workflow"] },
+    { "topic": "Enterprise Incident Management", "days": ["Major Incident Command", "Enterprise Breach Scenarios", "Multi-System Isolation", "External Escalation", "Root Cause Analysis", "Reality Task: Coordinate breach response"] },
+    { "topic": "Attack & Defense Simulation", "days": ["Red Team Tactics", "Blue Team Defenses", "Purple Team Collaboration", "Live Attack Mitigation", "Post-Simulation Debrief", "Reality Task: Defend infrastructure"] },
+    { "topic": "Security Operations Management", "days": ["Incident Prioritization", "Resource Management", "Operational Metrics", "Crisis Escalations", "Team Playbook Updates", "Reality Task: Manage simultaneous incidents"] },
+    { "topic": "Executive Boardroom Defense", "days": ["12-Month Security Roadmap", "Justifying Security Investments", "Executive Deck Preparation", "Mock Board Defense", "Final Review", "Reality Task: Present cybersecurity strategy"] }
+  ]
+}
+
+# ============================================================
 # HELPER FUNCTIONS
 # ============================================================
 
@@ -249,6 +336,53 @@ def deduplicate_links(
     return deduped[:max_links]
 
 # ============================================================
+# NEW 6-PART AI GENERATION LOGIC
+# ============================================================
+
+async def generate_weekly_modules_via_ai(user_name, track, task_number, week_data):
+    """
+    Prompts Gemini to generate 6 specific daily modules based on the week's syllabus.
+    """
+    prompt = f"""
+    You are Sola, the Lead Technical Supervisor at WDC Labs.
+    Your intern, {user_name}, is starting Week {task_number} of the {track} track.
+
+    The focus for this week is: "{week_data['topic']}"
+    
+    You must generate exactly 6 modules. Days 1 to 5 are immersive learning modules. The 6th module is the "Reality Task" where they execute a practical project.
+    
+    Here is the exact daily breakdown you must follow:
+    1. {week_data['days'][0]}
+    2. {week_data['days'][1]}
+    3. {week_data['days'][2]}
+    4. {week_data['days'][3]}
+    5. {week_data['days'][4]}
+    6. {week_data['days'][5]}
+
+    Return the response as a JSON array containing EXACTLY 6 objects. DO NOT wrap in markdown, return pure JSON.
+    Each object must have:
+    - "title": (String, e.g. "Day 1: What is Data Analytics?")
+    - "brief_content": (String, a rich, engaging Markdown brief for this specific day. Include simulated corporate context, learning objectives, and clear instructions.)
+    - "difficulty": (String, "Beginner" for days 1-3, "Intermediate" for 4-5, "Advanced" for the Reality Task)
+    """
+
+    response = await asyncio.to_thread(
+        model.generate_content,
+        prompt,
+        generation_config={"response_mime_type": "application/json"}
+    )
+    
+    raw_data = json.loads(response.text)
+    
+    # Handle both direct arrays or wrapped dicts
+    if isinstance(raw_data, dict) and "tasks" in raw_data:
+        return raw_data["tasks"]
+    elif isinstance(raw_data, list):
+        return raw_data
+    else:
+        raise ValueError("AI failed to return an array of 6 tasks")
+
+# ============================================================
 # ASYNC QUEUE WORKER ENGINE FOR TASKS
 # ============================================================
 
@@ -276,118 +410,81 @@ async def queue_worker():
     while True:
         req = await task_queue.get()
         try:
-            logger.info(f"⚙️ Background Worker processing task generation for {req.user_name}")
+            logger.info(f"⚙️️ Worker processing 6-Part Week Generation for {req.user_name}")
             
-            task = await generate_with_retry(
-                generate_task,
+            # 1. Lookup the Syllabus
+            track_key = req.track.lower().replace(" ", "-") if req.track else "data-analytics"
+            if track_key not in TRACK_SYLLABUS: track_key = "data-analytics"
+            
+            syllabus_list = TRACK_SYLLABUS[track_key]
+            week_index = min(max(req.task_number - 1, 0), len(syllabus_list) - 1)
+            week_data = syllabus_list[week_index]
+
+            # 2. Generate 6 modules via Gemini
+            modules = await generate_with_retry(
+                generate_weekly_modules_via_ai,
                 user_name=req.user_name,
                 track=req.track,
-                deadline_display=req.deadline_display,
-                experience_level=req.experience_level,
-                difficulty=req.difficulty,
                 task_number=req.task_number,
-                user_city=req.user_city,
-                include_ethical_trap=req.include_ethical_trap,
-                model=model,
-                include_video_brief=req.include_video_brief
+                week_data=week_data
             )
 
-            if not isinstance(task, dict):
-                logger.error("Task generation returned invalid response format")
+            if not isinstance(modules, list) or len(modules) < 1:
+                logger.error("AI returned invalid module format")
                 continue
 
-            if "title" in task and isinstance(task["title"], str):
-                raw_title = task["title"]
-                user_name = req.user_name
-
-                if user_name.lower() in raw_title.lower():
-                    raw_title = re.sub(
-                        rf"{re.escape(user_name)}\s*[:\-\|]*\s*", 
-                        "", 
-                        raw_title, 
-                        flags=re.IGNORECASE
-                    )
-                
-                if ":" in raw_title:
-                    raw_title = raw_title.split(":")[-1]
-
-                task["title"] = raw_title.strip()
-
+            # 3. Fetch Serper Resources (We fetch once for the overall week topic to save time)
             SERPER_API_KEY = os.getenv("SERPER_API_KEY")
             resource_array = []
             
-            existing_resources = task.get("educational_resources", "")
-            if isinstance(existing_resources, str) and existing_resources:
-                for i, raw_link in enumerate(existing_resources.split(",")):
-                    clean_link = raw_link.strip()
-                    if clean_link:
-                        is_yt = "youtube" in clean_link or "youtu.be" in clean_link
-                        resource_array.append({
-                            "id": f"res-ai-{i}-{int(time.time())}",
-                            "title": f"Learning Resource {i + 1}",
-                            "type": "video" if is_yt else ("pdf" if clean_link.lower().endswith(".pdf") else "web"),
-                            "category": "Video Resources" if is_yt else "Reference Links",
-                            "description": "Video tutorial supporting this task" if is_yt else "Helpful article or PDF for completing this task",
-                            "url": clean_link
-                        })
-
             if SERPER_API_KEY:
-                task_title = task.get("title", "tutorial")
-
                 enrichment = await fetch_serper_resources(
                     track=req.track,
-                    task_title=task_title,
+                    task_title=week_data['topic'],
                     api_key=SERPER_API_KEY
                 )
-                
                 for i, cache_res in enumerate(enrichment.get("cache_results", [])):
                     link = cache_res.get("link", cache_res.get("url", ""))
                     if link:
                         is_yt = "youtube" in link or "youtu.be" in link
                         resource_array.append({
                             "id": f"cache-vid-{i}-{int(time.time())}",
-                            "title": cache_res.get("title", f"Video Guide {i+1}"),
+                            "title": cache_res.get("title", f"Guide {i+1}"),
                             "type": cache_res.get("type", "video" if is_yt else "web"),
-                            "category": cache_res.get("category", "Video Resources"),
+                            "category": cache_res.get("category", "Learning Resources"),
                             "description": cache_res.get("snippet", "Reference material"),
                             "url": link
                         })
 
-                if enrichment.get("cache_results"):
-                    cache_query = f"{req.track} {task_title}"
-                    await sync_search_cache(query=cache_query, results=enrichment.get("cache_results"))
-
-            logger.info(f"✅ Background task fully generated for {req.user_name}!")
-            
+            # 4. Save to Supabase via Bulk Insert
             SUPABASE_URL = os.getenv("SUPABASE_URL")
-            SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
+            SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
             
             if SUPABASE_URL and SUPABASE_SERVICE_KEY:
-                
-                default_persona = {
-                    "role": "Supervisor",
-                    "tone": "professional",
-                    "expertise": req.track,
-                    "instruction": "Review submission thoroughly",
-                    "deadline_display": req.deadline_display or "Friday, 11:59 PM"
-                }
+                db_payloads = []
+                base_time = datetime.utcnow()
 
-                db_payload = {
-                    "user": req.user_id,
-                    "title": task.get("title", "New Assignment"),
-                    "brief_content": task.get("brief_content", task.get("brief", task.get("description", "Please review the resources."))),
-                    "difficulty": task.get("difficulty", req.difficulty or "intermediate"),
-                    "task_track": req.track,
-                    "ai_persona_config": task.get("ai_persona_config", default_persona),
-                    "completed": False,
-                    "status": "pending",
-                    "task_number": req.task_number,
-                    "resources": resource_array,
-                    "video_brief": task.get("video_brief", ""),
-                    "deadline_display": task.get("deadline_display", req.deadline_display or "Friday, 11:59 PM")
-                }
+                # Build the 6 payloads, offsetting created_at so Day 1 sorts before Day 2, etc.
+                for i, mod in enumerate(modules):
+                    db_payloads.append({
+                        "user": req.user_id,
+                        "title": mod.get("title", f"Day {i+1}"),
+                        "brief_content": mod.get("brief_content", "Please review the resources."),
+                        "difficulty": mod.get("difficulty", "intermediate"),
+                        "task_track": req.track,
+                        "ai_persona_config": {
+                            "role": "Supervisor", "tone": "professional", "expertise": req.track, "instruction": "Review submission thoroughly"
+                        },
+                        "completed": False,
+                        "status": "pending",
+                        "task_number": req.task_number,
+                        "resources": resource_array,
+                        "video_brief": "",
+                        "deadline_display": req.deadline_display or "Friday, 11:59 PM",
+                        "created_at": (base_time + timedelta(seconds=i)).isoformat()
+                    })
 
-                async with httpx.AsyncClient(timeout=15.0) as client:
+                async with httpx.AsyncClient(timeout=30.0) as client:
                     db_res = await client.post(
                         f"{SUPABASE_URL}/rest/v1/tasks",
                         headers={
@@ -396,15 +493,15 @@ async def queue_worker():
                             "Content-Type": "application/json",
                             "Prefer": "return=minimal"
                         },
-                        json=db_payload
+                        json=db_payloads
                     )
 
                     if db_res.status_code >= 400:
-                        logger.error(f"❌ SUPABASE SAVE FAILED: {db_res.status_code} | {db_res.text}")
+                        logger.error(f"❌ SUPABASE BULK SAVE FAILED: {db_res.status_code} | {db_res.text}")
                     else:
-                        logger.info(f"💾 Successfully saved Week {req.task_number} task for {req.user_name} to the 'tasks' table!")
+                        logger.info(f"💾 Successfully saved 6-part Week {req.task_number} for {req.user_name}!")
             else:
-                logger.error("Missing Supabase Environment Variables. Cannot save task.")
+                logger.error("Missing Supabase Variables.")
 
         except Exception as e:
             logger.error(f"TASK GENERATION BACKGROUND ERROR: {str(e)}")
@@ -1015,10 +1112,8 @@ async def generate_tasks(req: TaskRequest):
         
         # 🚨 THE IRON GATE: VALIDATE USER STATE BEFORE QUEUEING 🚨
         if not hasattr(req, 'user_id') or not req.user_id:
-            # SHUT THE LOOPHOLE: Do not 'pass', block it.
             raise HTTPException(status_code=400, detail="Access Denied: Missing User ID.")
             
-        # 🔥 NEW: If an Admin is forcing this, skip the progression locks entirely!
         elif req.is_admin_override:
             logger.info(f"🛡️ Admin Override Active: Bypassing progression gates for {req.user_name}")
             pass 
@@ -1034,7 +1129,6 @@ async def generate_tasks(req: TaskRequest):
                 if prog_res.status_code == 200:
                     prog_data = prog_res.json()
                     
-                    # SHUT THE LOOPHOLE: If they don't have a progression row yet, ensure their desk is empty.
                     if not prog_data:
                         task_check = await client.get(
                             f"{SUPABASE_URL}/rest/v1/tasks?user=eq.{req.user_id}&select=id",
@@ -1048,9 +1142,7 @@ async def generate_tasks(req: TaskRequest):
                     else:
                         week_status = prog_data[0].get("week_status")
                         
-                        # GATE 1: Desk is Full (With Glitch Recovery)
                         if week_status in ["in_progress", "needs_revision"]:
-                            # Verify if they ACTUALLY have a pending task on their desk
                             task_check = await client.get(
                                 f"{SUPABASE_URL}/rest/v1/tasks?user=eq.{req.user_id}&status=in.(pending,submitted,under_review,needs_revision)",
                                 headers={"apikey": SUPABASE_SERVICE_KEY, "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}"}
@@ -1060,9 +1152,7 @@ async def generate_tasks(req: TaskRequest):
                                     status_code=403, 
                                     detail="Access Denied: You already have an active task on your desk. Complete it before requesting a new one."
                                 )
-                            # If len == 0, their desk is genuinely empty due to a glitch. Let them pass!
                             
-                        # GATE 2: Early Generation Spam Block (The Weekend Lock)
                         elif week_status == "passed_waiting":
                             raise HTTPException(
                                 status_code=403,
@@ -1075,17 +1165,16 @@ async def generate_tasks(req: TaskRequest):
         logger.error(f"GATEKEEPER ERROR: {str(e)}")
         pass 
 
-    # If they pass the gates, put them in the queue
     await task_queue.put(req)
     
     return {
         "status": "processing",
-        "message": "Your task is being safely generated by the AI Engine. This might take a moment.",
+        "message": "Your 6-part learning module is being generated. This might take a moment.",
         "queue_position": task_queue.qsize()
     }
 
 # ============================================================
-# REGENERATE TASK ENDPOINT (NEW)
+# REGENERATE TASK ENDPOINT
 # ============================================================
 
 @app.post("/regenerate-task")
@@ -1099,7 +1188,6 @@ async def regenerate_existing_task(req: RegenerateRequest):
         SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
         
         async with httpx.AsyncClient() as client:
-            # 1. Check if the task has already been regenerated
             check_res = await client.get(
                 f"{SUPABASE_URL}/rest/v1/tasks?id=eq.{req.task_id}&select=is_regenerated",
                 headers={"apikey": SUPABASE_SERVICE_KEY, "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}"}
@@ -1110,7 +1198,6 @@ async def regenerate_existing_task(req: RegenerateRequest):
                 if data and data[0].get("is_regenerated"):
                     raise HTTPException(status_code=400, detail="This task has already been regenerated once.")
 
-        # 2. Generate a fresh brief (No Serper fetching needed, we keep the original resources to save time!)
         task = await generate_with_retry(
             generate_task,
             user_name=req.user_name,
@@ -1125,7 +1212,6 @@ async def regenerate_existing_task(req: RegenerateRequest):
             include_video_brief=False 
         )
 
-        # 3. Scrub the title dynamically
         raw_title = task.get("title", "New Task")
         if req.user_name and req.user_name.lower() in raw_title.lower():
             raw_title = re.sub(rf"{re.escape(req.user_name)}\s*[:\-\|]*\s*", "", raw_title, flags=re.IGNORECASE)
@@ -1133,7 +1219,6 @@ async def regenerate_existing_task(req: RegenerateRequest):
             raw_title = raw_title.split(":")[-1]
         clean_title = raw_title.strip()
 
-        # 4. Overwrite the task in the database
         update_payload = {
             "title": clean_title,
             "brief_content": task.get("brief_content", task.get("brief", task.get("description", ""))),

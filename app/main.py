@@ -4,7 +4,7 @@ print("🚀 RUNNING THIS MAIN FILE:", __file__)
 WDC Labs AI Backend
 Production-Grade FastAPI Backend
 Immersive Virtual Office AI System
-Updated for 5-Day + Reality Task Framework
+Updated for 5-Day Actionable Tasks & Shared Drive Generation
 """
 
 # ============================================================
@@ -336,53 +336,6 @@ def deduplicate_links(
     return deduped[:max_links]
 
 # ============================================================
-# NEW 6-PART AI GENERATION LOGIC
-# ============================================================
-
-async def generate_weekly_modules_via_ai(user_name, track, task_number, week_data):
-    """
-    Prompts Gemini to generate 6 specific daily modules based on the week's syllabus.
-    """
-    prompt = f"""
-    You are Sola, the Lead Technical Supervisor at WDC Labs.
-    Your intern, {user_name}, is starting Week {task_number} of the {track} track.
-
-    The focus for this week is: "{week_data['topic']}"
-    
-    You must generate exactly 6 modules. Days 1 to 5 are immersive learning modules. The 6th module is the "Reality Task" where they execute a practical project.
-    
-    Here is the exact daily breakdown you must follow:
-    1. {week_data['days'][0]}
-    2. {week_data['days'][1]}
-    3. {week_data['days'][2]}
-    4. {week_data['days'][3]}
-    5. {week_data['days'][4]}
-    6. {week_data['days'][5]}
-
-    Return the response as a JSON array containing EXACTLY 6 objects. DO NOT wrap in markdown, return pure JSON.
-    Each object must have:
-    - "title": (String, e.g. "Day 1: What is Data Analytics?")
-    - "brief_content": (String, a rich, engaging Markdown brief for this specific day. Include simulated corporate context, learning objectives, and clear instructions.)
-    - "difficulty": (String, "Beginner" for days 1-3, "Intermediate" for 4-5, "Advanced" for the Reality Task)
-    """
-
-    response = await asyncio.to_thread(
-        model.generate_content,
-        prompt,
-        generation_config={"response_mime_type": "application/json"}
-    )
-    
-    raw_data = json.loads(response.text)
-    
-    # Handle both direct arrays or wrapped dicts
-    if isinstance(raw_data, dict) and "tasks" in raw_data:
-        return raw_data["tasks"]
-    elif isinstance(raw_data, list):
-        return raw_data
-    else:
-        raise ValueError("AI failed to return an array of 6 tasks")
-
-# ============================================================
 # ASYNC QUEUE WORKER ENGINE FOR TASKS
 # ============================================================
 
@@ -406,11 +359,59 @@ async def generate_with_retry(func, *args, max_retries=5, **kwargs):
             else:
                 raise e 
 
+async def generate_weekly_modules_via_ai(user_name, track, task_number, week_data):
+    """
+    Prompts Gemini to generate 6 specific daily modules based on the week's syllabus.
+    Now rigorously enforces submissions for every day and generates mock files.
+    """
+    prompt = f"""
+    You are Sola, the Lead Technical Supervisor at WDC Labs.
+    Your intern, {user_name}, is starting Week {task_number} of the {track} track.
+
+    The focus for this week is: "{week_data['topic']}"
+    
+    You must generate exactly 6 modules. Days 1 to 5 are daily actionable tasks. The 6th module is the "Reality Task" (the capstone).
+    
+    Here is the daily breakdown you must follow:
+    1. {week_data['days'][0]}
+    2. {week_data['days'][1]}
+    3. {week_data['days'][2]}
+    4. {week_data['days'][3]}
+    5. {week_data['days'][4]}
+    6. {week_data['days'][5]}
+
+    CRITICAL RULES:
+    1. ACTIONABLE DELIVERABLES ONLY: Every single day (Days 1-6) MUST explicitly require the user to submit a deliverable (e.g., a short report, code snippet, spreadsheet, or URL). 
+    2. THE SHARED DRIVE RULE (MANDATORY): You MUST generate at least ONE raw mock file (CSV dataset, txt log, or policy document) required to complete the Reality Task or one of the daily tasks. DO NOT leave the shared_drive array empty.
+
+    Return the response as a JSON array containing EXACTLY 6 objects. DO NOT wrap in markdown, return pure JSON.
+    Each object must have:
+    - "title": (String, e.g. "Day 1: What is Data Analytics?")
+    - "brief_content": (String, a rich, engaging Markdown brief. Include corporate context, learning objectives, and clear instructions for the required submission.)
+    - "difficulty": (String, "Beginner" for days 1-3, "Intermediate" for 4-5, "Advanced" for the Reality Task)
+    - "shared_drive": (Array of Objects) You MUST include at least one mock file for the Reality Task. Format: [{{"filename": "company_data.csv", "content": "id,name,revenue\\n1,Acme,50000"}}]
+    """
+
+    response = await asyncio.to_thread(
+        model.generate_content,
+        prompt,
+        generation_config={"response_mime_type": "application/json"}
+    )
+    
+    raw_data = json.loads(response.text)
+    
+    if isinstance(raw_data, dict) and "tasks" in raw_data:
+        return raw_data["tasks"]
+    elif isinstance(raw_data, list):
+        return raw_data
+    else:
+        raise ValueError("AI failed to return an array of 6 tasks")
+
 async def queue_worker():
     while True:
         req = await task_queue.get()
         try:
-            logger.info(f"⚙️️ Worker processing 6-Part Week Generation for {req.user_name}")
+            logger.info(f"⚙ Worker processing 6-Part Week Generation for {req.user_name}")
             
             # 1. Lookup the Syllabus
             track_key = req.track.lower().replace(" ", "-") if req.track else "data-analytics"
@@ -466,6 +467,9 @@ async def queue_worker():
 
                 # Build the 6 payloads, offsetting created_at so Day 1 sorts before Day 2, etc.
                 for i, mod in enumerate(modules):
+                    # Extract the shared drive mock files
+                    shared_files = mod.get("shared_drive", [])
+                    
                     db_payloads.append({
                         "user": req.user_id,
                         "title": mod.get("title", f"Day {i+1}"),
@@ -479,6 +483,7 @@ async def queue_worker():
                         "status": "pending",
                         "task_number": req.task_number,
                         "resources": resource_array,
+                        "attachments": shared_files,  # Saving the generated mock data here!
                         "video_brief": "",
                         "deadline_display": req.deadline_display or "Friday, 11:59 PM",
                         "created_at": (base_time + timedelta(seconds=i)).isoformat()

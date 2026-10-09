@@ -381,12 +381,14 @@ async def generate_weekly_modules_via_ai(user_name, track, task_number, week_dat
     6. {week_data['days'][5]}
 
     CRITICAL RULES:
-    1. ACTIONABLE DELIVERABLES ONLY: Every single day (Days 1-6) MUST explicitly require the user to submit a deliverable (e.g., a short report, code snippet, spreadsheet, or URL). 
-    2. THE SHARED DRIVE RULE (MANDATORY): You MUST generate at least ONE raw mock file (CSV dataset, txt log, or policy document) required to complete the Reality Task or one of the daily tasks. DO NOT leave the shared_drive array empty.
+    1. STRICT DOMAIN ALIGNMENT: You are generating tasks strictly for the "{track}" track. ALL terminology, corporate context, and assignments MUST align perfectly with {track}. Do NOT hallucinate concepts or welcome messages from other tracks (e.g., if the track is Digital Marketing, do not mention Data Analytics).
+    2. CLASSROOM-STYLE GRADABLE TASKS ONLY: DO NOT assign passive tasks like "Take notes," "Read articles," "Prepare questions," or "Seek out videos." Every single day (Days 1-6) MUST explicitly require the user to submit a concrete, gradable deliverable (e.g., a written analysis, a short strategy brief, a campaign outline, a security assessment, or a dataset breakdown).
+    3. REFERENCE ATTACHED MATERIALS: The system automatically attaches relevant learning videos and documents to the dashboard. Frame your instructions to say "Review the attached video and materials, then complete the following assignment." Do not ask the student to search for videos.
+    4. THE SHARED DRIVE RULE (MANDATORY): You MUST generate at least ONE raw mock file (CSV dataset, txt log, or policy document) required to complete the Reality Task or one of the daily tasks. DO NOT leave the shared_drive array empty.
 
     Return the response as a JSON array containing EXACTLY 6 objects. DO NOT wrap in markdown, return pure JSON.
     Each object must have:
-    - "title": (String, e.g. "Day 1: What is Data Analytics?")
+    - "title": (String, e.g. "Day 1: [Specific Topic]")
     - "brief_content": (String, a rich, engaging Markdown brief. Include corporate context, learning objectives, and clear instructions for the required submission.)
     - "difficulty": (String, "Beginner" for days 1-3, "Intermediate" for 4-5, "Advanced" for the Reality Task)
     - "shared_drive": (Array of Objects) You MUST include at least one mock file for the Reality Task. Format: [{{"filename": "company_data.csv", "content": "id,name,revenue\\n1,Acme,50000"}}]

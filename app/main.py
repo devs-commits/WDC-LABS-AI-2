@@ -1005,11 +1005,12 @@ async def fetch_serper_resources(
             logger.error(f"DOCUMENT SEARCH ERROR: {str(e)}")
 
         try:
-            video_query = f"{track} {pruned_title} tutorial video"
+            # Broaden the query so Serper always finds top YouTube hits
+            video_query = f"{track} {task_title} beginner tutorial"
             video_res = await client.post(
                 "https://google.serper.dev/videos",
                 headers=headers,
-                json={"q": video_query, "num": 5}
+                json={"q": video_query, "num": 3} 
             )
 
             if video_res.status_code == 200:

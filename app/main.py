@@ -381,8 +381,8 @@ async def generate_weekly_modules_via_ai(user_name, track, task_number, week_dat
     6. {week_data['days'][5]}
 
     CRITICAL RULES:
-    1. STRICT DOMAIN ALIGNMENT: You are generating tasks strictly for the "{track}" track. ALL terminology, corporate context, and assignments MUST align perfectly with {track}. Do NOT hallucinate concepts or welcome messages from other tracks (e.g., if the track is Digital Marketing, do not mention Data Analytics).
-    2. CLASSROOM-STYLE GRADABLE TASKS ONLY: DO NOT assign passive tasks like "Take notes," "Read articles," "Prepare questions," or "Seek out videos." Every single day (Days 1-6) MUST explicitly require the user to submit a concrete, gradable deliverable (e.g., a written analysis, a short strategy brief, a campaign outline, a security assessment, or a dataset breakdown).
+    1. STRICT DOMAIN ALIGNMENT: You are generating tasks strictly for the "{track}" track. ALL terminology, corporate context, and assignments MUST align perfectly with {track}. Do NOT hallucinate concepts or welcome messages from other tracks.
+    2. BEGINNER-FRIENDLY PROGRESSION: The intern is a complete beginner. For Days 1 to 3, tasks MUST be extremely simple, unintimidating, and foundational. DO NOT assign "analytical briefs," "strategic imperatives," or essays. Instead, ask them to "Write a 3-bullet point list," "Write a 50-word summary," or "Define 3 terms in your own words based on the video." Gradually increase difficulty towards Day 5.
     3. REFERENCE ATTACHED MATERIALS: The system automatically attaches relevant learning videos and documents to the dashboard. Frame your instructions to say "Review the attached video and materials, then complete the following assignment." Do not ask the student to search for videos.
     4. THE SHARED DRIVE RULE (MANDATORY): You MUST generate at least ONE raw mock file (CSV dataset, txt log, or policy document) required to complete the Reality Task or one of the daily tasks. DO NOT leave the shared_drive array empty.
 

@@ -242,31 +242,37 @@ Detect the appropriate agent category and respond with ONLY the agent name.
         submission_content: str,
         client_constraints: Optional[str] = None,
         attempt_number: int = 1,
-        current_identity: str = "Intern",           # <--- ADDED: Passes Identity to Sola
-        badge_opportunity: Optional[str] = None     # <--- ADDED: Passes Badge Goal to Sola
+        current_identity: str = "Intern",           
+        badge_opportunity: Optional[str] = None     
     ) -> dict:
+
+        # 🔥 INJECTED LENIENCY RULE FOR BEGINNERS
+        leniency_rule = """
+        CRITICAL RULE - GRADING LENIENCY FOR BEGINNERS: 
+        Focus entirely on the accuracy, effort, and substance of the content. DO NOT reject or fail a submission purely for minor formatting deviations (e.g., writing paragraphs instead of a bulleted list, or slight structural differences). If the core required information is present and conceptually correct, YOU MUST MARK IT AS PASSED ("passed": true). You may mention the formatting preference in your feedback as a gentle tip for future corporate communication, but it must NEVER be the reason for a "Revisions Needed" rejection.
+        """
+
+        # Append the rule to any existing constraints
+        combined_constraints = f"{client_constraints or ''}\n\n{leniency_rule}".strip()
 
         review = await sola.review_submission(
             task_title=task_title,
             task_brief=task_brief,
             submission_content=submission_content,
-            client_constraints=client_constraints,
+            client_constraints=combined_constraints, # <--- Rule is passed directly to Sola here
             model=self.model,
             attempt_number=attempt_number,
-            current_identity=current_identity,       # <--- PASSED DOWN
-            badge_opportunity=badge_opportunity      # <--- PASSED DOWN
+            current_identity=current_identity,       
+            badge_opportunity=badge_opportunity      
         )
 
         # --- 3-STRIKE FAIL-FORWARD BACKEND SAFEGUARD ---
-        # Even if Sola (the LLM) fails to output a pass, our Python backend forcefully overrides it
         if attempt_number >= 3:
             review["passed"] = True
             
-            # Ensure a fallback score exists just in case Sola returned none
             if not review.get("score"):
-                review["score"] = 65  # Base passing mercy score
+                review["score"] = 65 
                 
-            # Guarantee the mandatory transition messaging is in the feedback payload
             fallback_msg = "We are moving you to the next stage so you can continue progressing, but please take time to study the materials provided for this task to strengthen your understanding."
             current_feedback = review.get("feedback", "")
             if fallback_msg not in current_feedback:
